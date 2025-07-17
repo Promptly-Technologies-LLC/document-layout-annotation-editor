@@ -1,0 +1,13 @@
+{
+  "name": "pdf-annotation-editor",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run server.js",
+    "server": "bun run server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.0",
+    "cors": "^2.8.5"
+  }
+}

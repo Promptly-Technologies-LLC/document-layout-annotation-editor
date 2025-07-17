@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Annotation Editor</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: visible;
+        }
+        
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+        }
+        
+        .controls {
+            background: #34495e;
+            padding: 15px 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .file-input {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .file-input select, .file-input input[type="file"] {
+            background: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            min-width: 200px;
+        }
+        
+        .navigation {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .nav-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .nav-btn:hover {
+            background: #2980b9;
+        }
+        
+        .nav-btn:disabled {
+            background: #7f8c8d;
+            cursor: not-allowed;
+        }
+        
+        .page-info {
+            color: white;
+            font-size: 14px;
+        }
+        
+        .save-status {
+            margin-left: auto;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        
+        .save-status.success {
+            background: #27ae60;
+            color: white;
+        }
+        
+        .save-status.error {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        .save-status.auto {
+            background: #f39c12;
+            color: white;
+        }
+        
+        .viewer-container {
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .pdf-container {
+            position: relative;
+            display: inline-block;
+            border: 1px solid #ddd;
+            background: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .pdf-canvas {
+            display: block;
+        }
+        
+        .annotation-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        .bounding-box {
+            position: absolute;
+            border: 2px solid #e74c3c;
+            background: rgba(231, 76, 60, 0.1);
+            cursor: move;
+            pointer-events: all;
+            min-width: 10px;
+            min-height: 10px;
+        }
+        
+        .bounding-box:hover {
+            border-color: #c0392b;
+            background: rgba(231, 76, 60, 0.2);
+        }
+        
+        .bounding-box.selected {
+            border-color: #2980b9;
+            background: rgba(41, 128, 185, 0.1);
+        }
+        
+        .resize-handle {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: #2980b9;
+            border: 1px solid white;
+            border-radius: 50%;
+        }
+        
+        .resize-handle.nw { top: -4px; left: -4px; cursor: nw-resize; }
+        .resize-handle.ne { top: -4px; right: -4px; cursor: ne-resize; }
+        .resize-handle.sw { bottom: -4px; left: -4px; cursor: sw-resize; }
+        .resize-handle.se { bottom: -4px; right: -4px; cursor: se-resize; }
+        
+        .label {
+            position: absolute;
+            top: -25px;
+            left: 0;
+            background: #2c3e50;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            white-space: nowrap;
+            cursor: text;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .type-select {
+            background: #2c3e50;
+            color: white;
+            border: 2px solid #3498db;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            width: 150px;
+            min-width: 150px;
+            white-space: nowrap;
+            cursor: pointer;
+            display: block;
+            appearance: auto;
+            height: 25px;
+            min-height: 25px;
+            box-sizing: border-box;
+        }
+        
+        .type-select option {
+            background: #2c3e50;
+            color: white;
+            padding: 2px 8px;
+        }
+        
+        .type-select:focus {
+            outline: 2px solid #3498db;
+        }
+        
+        .loading {
+            padding: 40px;
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 18px;
+        }
+        
+        .error {
+            padding: 40px;
+            text-align: center;
+            color: #e74c3c;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>PDF Annotation Editor</h1>
+            <p>Select PDF and JSON files to view and edit annotations</p>
+        </div>
+        
+        <div class="controls">
+            <div class="file-input">
+                <label for="pdf-select">PDF:</label>
+                <select id="pdf-select">
+                    <option value="">Select PDF file...</option>
+                </select>
+            </div>
+            
+            <div class="file-input">
+                <label for="json-select">JSON:</label>
+                <select id="json-select">
+                    <option value="">Select JSON file...</option>
+                </select>
+            </div>
+            
+            <button class="nav-btn" id="refresh-files">Refresh Files</button>
+            
+            <div class="navigation">
+                <button class="nav-btn" id="prev-page" disabled>Previous</button>
+                <span class="page-info" id="page-info">Page 1 of 1</span>
+                <button class="nav-btn" id="next-page" disabled>Next</button>
+            </div>
+            
+            <div class="save-status" id="save-status" style="display: none;"></div>
+        </div>
+        
+        <div class="viewer-container" id="viewer-container">
+            <div class="loading">Select PDF and JSON files to begin</div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let pdfDoc = null;
+        let currentPage = 1;
+        let totalPages = 0;
+        let annotations = [];
+        let currentAnnotations = [];
+        let scale = 1;
+        let selectedBox = null;
+        let isDragging = false;
+        let isResizing = false;
+        let dragStart = { x: 0, y: 0 };
+        let resizeHandle = null;
+        let jsonFileName = '';
+        let autoSaveTimeout = null;
+
+        // PDF.js setup
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        // DOM elements
+        const pdfSelect = document.getElementById('pdf-select');
+        const jsonSelect = document.getElementById('json-select');
+        const refreshBtn = document.getElementById('refresh-files');
+        const viewerContainer = document.getElementById('viewer-container');
+        const prevBtn = document.getElementById('prev-page');
+        const nextBtn = document.getElementById('next-page');
+        const pageInfo = document.getElementById('page-info');
+        const saveStatus = document.getElementById('save-status');
+
+        // Event listeners
+        pdfSelect.addEventListener('change', handlePdfSelect);
+        jsonSelect.addEventListener('change', handleJsonSelect);
+        refreshBtn.addEventListener('click', loadFileList);
+        prevBtn.addEventListener('click', () => changePage(-1));
+        nextBtn.addEventListener('click', () => changePage(1));
+
+        // Initialize
+        loadFileList();
+
+        // Load available files
+        async function loadFileList() {
+            try {
+                const response = await fetch('/api/files');
+                const { pdfFiles, jsonFiles } = await response.json();
+                
+                // Populate PDF select
+                pdfSelect.innerHTML = '<option value="">Select PDF file...</option>';
+                pdfFiles.forEach(file => {
+                    const option = document.createElement('option');
+                    option.value = file;
+                    option.textContent = file;
+                    pdfSelect.appendChild(option);
+                });
+                
+                // Populate JSON select
+                jsonSelect.innerHTML = '<option value="">Select JSON file...</option>';
+                jsonFiles.forEach(file => {
+                    const option = document.createElement('option');
+                    option.value = file;
+                    option.textContent = file;
+                    jsonSelect.appendChild(option);
+                });
+                
+                showSuccess('File list refreshed');
+            } catch (error) {
+                showError('Error loading file list: ' + error.message);
+            }
+        }
+
+        // Handle PDF selection
+        async function handlePdfSelect(event) {
+            const filename = event.target.value;
+            if (!filename) return;
+
+            try {
+                showLoading('Loading PDF...');
+                const response = await fetch(`/pdfs/${filename}`);
+                const arrayBuffer = await response.arrayBuffer();
+                pdfDoc = await pdfjsLib.getDocument(arrayBuffer).promise;
+                totalPages = pdfDoc.numPages;
+                currentPage = 1;
+                updatePageInfo();
+                await renderPage();
+                showSuccess('PDF loaded successfully');
+            } catch (error) {
+                showError('Error loading PDF: ' + error.message);
+            }
+        }
+
+        // Handle JSON selection
+        async function handleJsonSelect(event) {
+            const filename = event.target.value;
+            if (!filename) return;
+
+            try {
+                jsonFileName = filename;
+                const response = await fetch(`/output/${filename}`);
+                annotations = await response.json();
+                if (pdfDoc) {
+                    await renderPage();
+                }
+                showSuccess('JSON loaded successfully');
+            } catch (error) {
+                showError('Error loading JSON: ' + error.message);
+            }
+        }
+
+        // Render current page
+        async function renderPage() {
+            if (!pdfDoc) return;
+
+            try {
+                const page = await pdfDoc.getPage(currentPage);
+                const viewport = page.getViewport({ scale: 1 });
+                
+                // Calculate scale to fit container
+                const containerWidth = Math.min(800, window.innerWidth - 80);
+                scale = containerWidth / viewport.width;
+                const scaledViewport = page.getViewport({ scale });
+
+                // Create canvas
+                const canvas = document.createElement('canvas');
+                canvas.className = 'pdf-canvas';
+                canvas.width = scaledViewport.width;
+                canvas.height = scaledViewport.height;
+
+                const context = canvas.getContext('2d');
+                await page.render({
+                    canvasContext: context,
+                    viewport: scaledViewport
+                }).promise;
+
+                // Create container
+                const pdfContainer = document.createElement('div');
+                pdfContainer.className = 'pdf-container';
+                pdfContainer.appendChild(canvas);
+
+                // Create annotation overlay
+                const overlay = document.createElement('div');
+                overlay.className = 'annotation-overlay';
+                overlay.style.width = scaledViewport.width + 'px';
+                overlay.style.height = scaledViewport.height + 'px';
+                pdfContainer.appendChild(overlay);
+
+                // Replace viewer content
+                viewerContainer.innerHTML = '';
+                viewerContainer.appendChild(pdfContainer);
+
+                // Render annotations for current page
+                renderAnnotations(overlay, scaledViewport);
+                
+                // Debug: Check if dropdowns are created and visible
+                setTimeout(() => {
+                    const dropdowns = document.querySelectorAll('.type-select');
+                    console.log('Found dropdowns after render:', dropdowns.length);
+                    dropdowns.forEach((dropdown, i) => {
+                        console.log(`Dropdown ${i}:`, dropdown);
+                        console.log(`Dropdown ${i} options:`, dropdown.options.length);
+                        console.log(`Dropdown ${i} in DOM:`, document.contains(dropdown));
+                    });
+                    
+                    // Add a test dropdown to verify dropdowns work in this context
+                    const testDropdown = document.createElement('select');
+                    testDropdown.style.position = 'absolute';
+                    testDropdown.style.top = '10px';
+                    testDropdown.style.left = '10px';
+                    testDropdown.style.zIndex = '99999';
+                    testDropdown.style.background = 'yellow';
+                    testDropdown.style.border = '2px solid red';
+                    testDropdown.innerHTML = '<option>Test Option 1</option><option>Test Option 2</option>';
+                    pdfContainer.appendChild(testDropdown);
+                    console.log('Added test dropdown:', testDropdown);
+                }, 200);
+
+            } catch (error) {
+                showError('Error rendering page: ' + error.message);
+            }
+        }
+
+        // Render annotations for current page
+        function renderAnnotations(overlay, viewport) {
+            currentAnnotations = annotations.filter(ann => ann.page_number === currentPage);
+            
+            currentAnnotations.forEach((annotation, index) => {
+                const box = createBoundingBox(annotation, index, viewport);
+                overlay.appendChild(box);
+                
+                // Create dropdown separately and add to overlay
+                const dropdown = createTypeDropdown(annotation, index, box, viewport);
+                overlay.appendChild(dropdown);
+            });
+        }
+
+        // Create bounding box element
+        function createBoundingBox(annotation, index, viewport) {
+            const box = document.createElement('div');
+            box.className = 'bounding-box';
+            box.dataset.index = index;
+
+            // Convert points to pixels and scale
+            const left = (annotation.left / annotation.page_width) * viewport.width;
+            const top = (annotation.top / annotation.page_height) * viewport.height;
+            const width = (annotation.width / annotation.page_width) * viewport.width;
+            const height = (annotation.height / annotation.page_height) * viewport.height;
+
+            box.style.left = left + 'px';
+            box.style.top = top + 'px';
+            box.style.width = width + 'px';
+            box.style.height = height + 'px';
+
+            // Create simple label for display
+            const label = document.createElement('div');
+            label.className = 'label';
+            label.textContent = annotation.type;
+            label.title = annotation.type;
+            box.appendChild(label);
+
+            // Create resize handles
+            ['nw', 'ne', 'sw', 'se'].forEach(position => {
+                const handle = document.createElement('div');
+                handle.className = `resize-handle ${position}`;
+                handle.dataset.position = position;
+                box.appendChild(handle);
+            });
+
+            // Add event listeners
+            box.addEventListener('mousedown', handleMouseDown);
+            box.addEventListener('click', handleBoxClick);
+
+            return box;
+        }
+
+        // Create type dropdown element (separate from bounding box)
+        function createTypeDropdown(annotation, index, box, viewport) {
+            const dropdown = document.createElement('select');
+            dropdown.className = 'type-select';
+            dropdown.id = `type-select-${index}`;
+            dropdown.name = `type-select-${index}`;
+            dropdown.dataset.boxIndex = index;
+            
+            // Position dropdown above the bounding box
+            const boxLeft = parseInt(box.style.left);
+            const boxTop = parseInt(box.style.top);
+            
+            dropdown.style.position = 'absolute';
+            dropdown.style.left = boxLeft + 'px';
+            dropdown.style.top = (boxTop - 30) + 'px';
+            dropdown.style.zIndex = '10000';
+            
+            // Define the type options from schema
+            const typeOptions = [
+                "Caption", "Footnote", "Formula", "List item", "Page footer",
+                "Page header", "Picture", "Section header", "Table", "Text", "Title"
+            ];
+
+            // Create options
+            let optionsHTML = '';
+            typeOptions.forEach(type => {
+                const selected = type === annotation.type ? ' selected' : '';
+                optionsHTML += `<option value="${type}"${selected}>${type}</option>`;
+            });
+            dropdown.innerHTML = optionsHTML;
+
+            // Add event listeners
+            dropdown.addEventListener('change', handleTypeChange);
+            dropdown.addEventListener('click', (e) => e.stopPropagation());
+
+            console.log('Created dropdown for annotation', index, 'at position', boxLeft, boxTop - 30);
+            
+            return dropdown;
+        }
+
+        // Handle mouse down on bounding box
+        function handleMouseDown(event) {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const box = event.currentTarget;
+            selectBox(box);
+
+            if (event.target.classList.contains('resize-handle')) {
+                isResizing = true;
+                resizeHandle = event.target.dataset.position;
+                isDragging = false;
+            } else if (event.target.classList.contains('bounding-box')) {
+                isDragging = true;
+                isResizing = false;
+                resizeHandle = null;
+            }
+
+            dragStart = {
+                x: event.clientX,
+                y: event.clientY,
+                boxLeft: parseInt(box.style.left),
+                boxTop: parseInt(box.style.top),
+                boxWidth: parseInt(box.style.width),
+                boxHeight: parseInt(box.style.height)
+            };
+
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+        }
+
+        // Handle mouse move for dragging/resizing
+        function handleMouseMove(event) {
+            if (!selectedBox) return;
+
+            const deltaX = event.clientX - dragStart.x;
+            const deltaY = event.clientY - dragStart.y;
+
+            if (isDragging) {
+                selectedBox.style.left = (dragStart.boxLeft + deltaX) + 'px';
+                selectedBox.style.top = (dragStart.boxTop + deltaY) + 'px';
+            } else if (isResizing) {
+                resizeBoundingBox(deltaX, deltaY);
+            }
+        }
+
+        // Handle resizing bounding box
+        function resizeBoundingBox(deltaX, deltaY) {
+            const minSize = 10;
+            let newLeft = dragStart.boxLeft;
+            let newTop = dragStart.boxTop;
+            let newWidth = dragStart.boxWidth;
+            let newHeight = dragStart.boxHeight;
+
+            switch (resizeHandle) {
+                case 'nw':
+                    newLeft += deltaX;
+                    newTop += deltaY;
+                    newWidth -= deltaX;
+                    newHeight -= deltaY;
+                    break;
+                case 'ne':
+                    newTop += deltaY;
+                    newWidth += deltaX;
+                    newHeight -= deltaY;
+                    break;
+                case 'sw':
+                    newLeft += deltaX;
+                    newWidth -= deltaX;
+                    newHeight += deltaY;
+                    break;
+                case 'se':
+                    newWidth += deltaX;
+                    newHeight += deltaY;
+                    break;
+            }
+
+            if (newWidth >= minSize && newHeight >= minSize) {
+                selectedBox.style.left = newLeft + 'px';
+                selectedBox.style.top = newTop + 'px';
+                selectedBox.style.width = newWidth + 'px';
+                selectedBox.style.height = newHeight + 'px';
+            }
+        }
+
+        // Handle mouse up
+        function handleMouseUp(event) {
+            if (isDragging || isResizing) {
+                updateAnnotation();
+                scheduleAutoSave();
+            }
+
+            isDragging = false;
+            isResizing = false;
+            resizeHandle = null;
+            
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        }
+
+        // Handle box click for selection
+        function handleBoxClick(event) {
+            if (event.target.classList.contains('label') || event.target.classList.contains('resize-handle')) {
+                return;
+            }
+            selectBox(event.currentTarget);
+        }
+
+        // Handle type change
+        function handleTypeChange(event) {
+            event.stopPropagation();
+            const dropdown = event.target;
+            const boxIndex = parseInt(dropdown.dataset.boxIndex);
+            const annotation = currentAnnotations[boxIndex];
+            
+            // Update annotation type
+            annotation.type = dropdown.value;
+            
+            // Update the label in the bounding box
+            const box = document.querySelector(`[data-index="${boxIndex}"]`);
+            if (box) {
+                const label = box.querySelector('.label');
+                if (label) {
+                    label.textContent = dropdown.value;
+                    label.title = dropdown.value;
+                }
+            }
+            
+            // Update in main annotations array
+            const mainIndex = annotations.findIndex(ann => 
+                ann.page_number === annotation.page_number && 
+                Math.abs(ann.left - annotation.left) < 1 && 
+                Math.abs(ann.top - annotation.top) < 1
+            );
+            if (mainIndex !== -1) {
+                annotations[mainIndex].type = dropdown.value;
+            }
+            
+            scheduleAutoSave();
+        }
+
+
+        // Select bounding box
+        function selectBox(box) {
+            if (selectedBox) {
+                selectedBox.classList.remove('selected');
+            }
+            selectedBox = box;
+            box.classList.add('selected');
+        }
+
+        // Update annotation data
+        function updateAnnotation() {
+            if (!selectedBox) return;
+
+            const index = parseInt(selectedBox.dataset.index);
+            const annotation = currentAnnotations[index];
+            const overlay = selectedBox.parentElement;
+            const viewport = {
+                width: parseInt(overlay.style.width),
+                height: parseInt(overlay.style.height)
+            };
+
+            // Convert pixels back to points
+            const left = (parseInt(selectedBox.style.left) / viewport.width) * annotation.page_width;
+            const top = (parseInt(selectedBox.style.top) / viewport.height) * annotation.page_height;
+            const width = (parseInt(selectedBox.style.width) / viewport.width) * annotation.page_width;
+            const height = (parseInt(selectedBox.style.height) / viewport.height) * annotation.page_height;
+
+            // Update annotation
+            annotation.left = left;
+            annotation.top = top;
+            annotation.width = width;
+            annotation.height = height;
+
+            // Type is now updated through the separate dropdown change handler
+
+            // Update in main annotations array
+            const mainIndex = annotations.findIndex(ann => 
+                ann.page_number === annotation.page_number && 
+                Math.abs(ann.left - annotation.left) < 1 && 
+                Math.abs(ann.top - annotation.top) < 1
+            );
+            if (mainIndex !== -1) {
+                annotations[mainIndex] = annotation;
+            }
+        }
+
+        // Schedule auto-save with debouncing
+        function scheduleAutoSave() {
+            if (autoSaveTimeout) {
+                clearTimeout(autoSaveTimeout);
+            }
+            
+            showAutoSave('Auto-saving...');
+            
+            autoSaveTimeout = setTimeout(async () => {
+                await saveAnnotations();
+            }, 1000); // Save after 1 second of no changes
+        }
+
+        // Save annotations to server
+        async function saveAnnotations() {
+            if (!jsonFileName) {
+                showError('No JSON file selected');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/save-json', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        filename: jsonFileName,
+                        data: annotations
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showSuccess(result.message);
+                } else {
+                    showError('Error: ' + result.error);
+                }
+            } catch (error) {
+                showError('Error saving annotations: ' + error.message);
+            }
+        }
+
+        // Change page
+        function changePage(direction) {
+            const newPage = currentPage + direction;
+            if (newPage >= 1 && newPage <= totalPages) {
+                currentPage = newPage;
+                updatePageInfo();
+                renderPage();
+            }
+        }
+
+        // Update page info display
+        function updatePageInfo() {
+            pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+            prevBtn.disabled = currentPage <= 1;
+            nextBtn.disabled = currentPage >= totalPages;
+        }
+
+        // Utility functions for status display
+        function showLoading(message) {
+            viewerContainer.innerHTML = `<div class="loading">${message}</div>`;
+        }
+
+        function showError(message) {
+            saveStatus.textContent = message;
+            saveStatus.className = 'save-status error';
+            saveStatus.style.display = 'block';
+            setTimeout(() => {
+                saveStatus.style.display = 'none';
+            }, 5000);
+        }
+
+        function showSuccess(message) {
+            saveStatus.textContent = message;
+            saveStatus.className = 'save-status success';
+            saveStatus.style.display = 'block';
+            setTimeout(() => {
+                saveStatus.style.display = 'none';
+            }, 3000);
+        }
+
+        function showAutoSave(message) {
+            saveStatus.textContent = message;
+            saveStatus.className = 'save-status auto';
+            saveStatus.style.display = 'block';
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if (pdfDoc && currentPage) {
+                renderPage();
+            }
+        });
+    </script>
+</body>
+</html>
