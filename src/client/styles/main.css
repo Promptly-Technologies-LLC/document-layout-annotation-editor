@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-200;
+  }
+
+  .btn-primary {
+    @apply btn bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
+  }
+
+  .btn-secondary {
+    @apply btn bg-gray-200 text-gray-900 hover:bg-gray-300 focus:ring-gray-500;
+  }
+
+  .btn-danger {
+    @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
+  }
+
+  .input {
+    @apply block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm;
+  }
+
+  .select {
+    @apply block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm;
+  }
+
+  .annotation-box {
+    @apply absolute border-2 border-primary-500 bg-primary-100 bg-opacity-20 cursor-move transition-all duration-200;
+  }
+
+  .annotation-box:hover {
+    @apply border-primary-600 bg-opacity-30;
+  }
+
+  .annotation-box.selected {
+    @apply border-primary-700 bg-opacity-40;
+  }
+
+  .resize-handle {
+    @apply absolute w-3 h-3 bg-primary-600 border border-white rounded-full cursor-pointer;
+  }
+
+  .resize-handle.nw { @apply -top-1 -left-1 cursor-nw-resize; }
+  .resize-handle.ne { @apply -top-1 -right-1 cursor-ne-resize; }
+  .resize-handle.sw { @apply -bottom-1 -left-1 cursor-sw-resize; }
+  .resize-handle.se { @apply -bottom-1 -right-1 cursor-se-resize; }
+
+  .annotation-label {
+    @apply absolute -top-8 left-0 bg-primary-700 text-white px-2 py-1 rounded text-xs whitespace-nowrap;
+  }
+
+  .annotation-dropdown {
+    @apply absolute bg-white border border-gray-300 rounded-md shadow-lg text-sm z-50;
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 #f1f5f9;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: #f1f5f9;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 3px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+}
