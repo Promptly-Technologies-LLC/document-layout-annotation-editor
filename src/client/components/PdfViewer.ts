@@ -30,8 +30,7 @@ export class PdfViewer {
     this.canvas.className = 'block';
     this.overlay.className = 'absolute inset-0';
     
-    this.container.appendChild(this.canvas);
-    this.container.appendChild(this.overlay);
+    // The canvas and overlay will be added on first render.
   }
 
   private setupEventListeners(): void {
@@ -41,6 +40,15 @@ export class PdfViewer {
     
     // Subscribe to annotation changes
     annotationStore.subscribe(() => this.renderAnnotations());
+  }
+
+  private prepareContainer(): void {
+    // Check if the container has been prepared by seeing if the canvas is a child.
+    if (!this.container.contains(this.canvas)) {
+      this.container.innerHTML = ''; // Clear placeholder content
+      this.container.appendChild(this.canvas);
+      this.container.appendChild(this.overlay);
+    }
   }
 
   async loadPdf(pdfUrl: string): Promise<void> {
@@ -54,6 +62,7 @@ export class PdfViewer {
   }
 
   async renderPage(pageNumber: number): Promise<void> {
+    this.prepareContainer(); // Ensures the canvas is in the DOM and placeholder is removed.
     try {
       this.currentPage = pageNumber;
       const pageInfo = await pdfService.renderPage(pageNumber, this.canvas);
