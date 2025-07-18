@@ -214,7 +214,6 @@ export class PdfViewer {
     textArea.placeholder = 'Enter annotation text...';
     textArea.className = 'text-input absolute left-0 right-0 bg-white border border-gray-300 rounded px-2 py-1 text-xs';
     textArea.style.top = '100%';
-    textArea.style.marginTop = '0.5rem';
     textArea.style.zIndex = '1000';
     textArea.style.height = '1.5rem';
     textArea.style.resize = 'none';
