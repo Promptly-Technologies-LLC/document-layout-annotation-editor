@@ -144,6 +144,9 @@ export class PdfViewer {
       annotationStore.updateAnnotation(annotation.id, { type: target.value as any });
     });
     
+    // Prevent mousedown from bubbling up to the annotation box handler
+    select.addEventListener('mousedown', e => e.stopPropagation());
+    
     box.appendChild(select);
     
     // Event listeners
