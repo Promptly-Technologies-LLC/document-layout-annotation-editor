@@ -29,7 +29,7 @@ export class PdfViewer {
   }
 
   private setupElements(): void {
-    this.container.className = 'relative bg-white shadow-lg rounded-lg overflow-hidden';
+    this.container.className = 'relative bg-white shadow-lg rounded-lg overflow-visible';
     
     this.canvas.className = 'block';
     this.overlay.className = 'absolute inset-0';
@@ -128,7 +128,7 @@ export class PdfViewer {
     
     // Add type selector
     const select = document.createElement('select');
-    select.className = 'annotation-dropdown absolute -top-7 right-0 bg-white border border-gray-300 rounded px-2 py-1 text-xs z-10';
+    select.className = 'annotation-dropdown absolute -top-7 right-0 bg-white border border-gray-300 rounded px-2 py-1 text-xs';
     select.innerHTML = `
       <option value="Text" ${annotation.type === 'Text' ? 'selected' : ''}>Text</option>
       <option value="Title" ${annotation.type === 'Title' ? 'selected' : ''}>Title</option>
@@ -155,7 +155,8 @@ export class PdfViewer {
     
     // Add delete button
     const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'delete-btn absolute -top-7 -right-7 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600 z-10';
+    deleteBtn.className = 'delete-btn absolute -top-7 -right-7 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600';
+    deleteBtn.style.zIndex = '1000';
     deleteBtn.innerHTML = '×';
     deleteBtn.title = 'Delete annotation';
     
@@ -174,7 +175,8 @@ export class PdfViewer {
     textInput.type = 'text';
     textInput.value = annotation.text || '';
     textInput.placeholder = 'Enter annotation text...';
-    textInput.className = 'text-input absolute -bottom-8 left-0 right-0 bg-white border border-gray-300 rounded px-2 py-1 text-xs z-10';
+    textInput.className = 'text-input absolute -bottom-8 left-0 right-0 bg-white border border-gray-300 rounded px-2 py-1 text-xs';
+    textInput.style.zIndex = '1000';
     
     textInput.addEventListener('input', (e) => {
       const target = e.target as HTMLInputElement;

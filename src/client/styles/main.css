@@ -61,7 +61,8 @@
   }
 
   .annotation-dropdown {
-    @apply absolute bg-white border border-gray-300 rounded-md shadow-lg text-sm z-50;
+    @apply absolute bg-white border border-gray-300 rounded-md shadow-lg text-sm;
+    z-index: 1000;
   }
 }
 

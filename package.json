@@ -10,7 +10,6 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "start": "node dist/server/index.js",
-    "lint": "eslint src --ext .ts,.js",
     "format": "prettier --write src",
     "type-check": "tsc --noEmit"
   },
