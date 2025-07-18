@@ -39,8 +39,8 @@ class ApiService {
     }
   }
 
-  async loadAnnotations(filename: string): Promise<Annotation[]> {
-    const response = await this.fetchJson<ApiResponse<Annotation[]>>(`${API_BASE}/annotations/${filename}`);
+  async loadAnnotations(filename: string): Promise<any[]> {
+    const response = await this.fetchJson<ApiResponse<any[]>>(`${API_BASE}/annotations/${filename}`);
     if (!response.success || !response.data) {
       throw new Error(response.error || 'Failed to load annotations');
     }

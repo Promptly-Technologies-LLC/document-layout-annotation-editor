@@ -35,8 +35,12 @@ export class AnnotationStoreManager {
     return { ...this.store };
   }
 
-  setAnnotations(annotations: Annotation[]): void {
-    this.store.annotations = [...annotations];
+  setAnnotations(annotations: any[]): void {
+    // Ensure all annotations have valid IDs and conform to the Annotation interface
+    this.store.annotations = annotations.map(annotation => ({
+      ...annotation,
+      id: annotation.id || crypto.randomUUID()
+    })) as Annotation[];
     this.store.isDirty = false;
     this.notify();
   }

@@ -49,12 +49,12 @@ export class FileService {
     return filePath;
   }
 
-  async loadAnnotations(filename: string): Promise<Annotation[]> {
+  async loadAnnotations(filename: string): Promise<any[]> {
     const safeName = this.sanitizeFilename(filename);
     const filePath = path.join(this.outputDir, safeName);
     
     const content = await fs.readFile(filePath, 'utf-8');
-    return JSON.parse(content) as Annotation[];
+    return JSON.parse(content) as any[];
   }
 
   async getFileInfo(filename: string, type: 'pdf' | 'json'): Promise<FileInfo> {

@@ -1,3 +1,1 @@
-Important! The correct format for calling the `replace_in_file` tool is to prefix with angle brackets (`<<<<<<< SEARCH`), *not* with hyphens or some other character type!
-
-If you fail twice to call `replace_in_file`, you may use `write_to_file` instead. This is less efficient, but it may work more reliably.
+Unfortunately, only your `write_to_file` tool is currently in a working state for file edits.

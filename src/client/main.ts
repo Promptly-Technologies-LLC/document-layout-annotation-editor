@@ -108,6 +108,9 @@ class App {
         this.saveAnnotations();
       }
     });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => this.handleKeyboardShortcuts(e));
   }
 
   private setupStoreSubscription(): void {
@@ -172,6 +175,42 @@ class App {
     pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
     (prevBtn as HTMLButtonElement).disabled = currentPage <= 1;
     (nextBtn as HTMLButtonElement).disabled = currentPage >= totalPages;
+  }
+
+  private handleKeyboardShortcuts(e: KeyboardEvent): void {
+    // Don't handle shortcuts if user is typing in an input field
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) {
+      return;
+    }
+
+    // Handle shortcuts
+    if (e.ctrlKey || e.metaKey) {
+      switch (e.key) {
+        case 's':
+          e.preventDefault();
+          this.saveAnnotations();
+          break;
+      }
+    } else {
+      switch (e.key) {
+        case 'ArrowLeft':
+          e.preventDefault();
+          this.pdfViewer?.prevPage().then(() => this.updatePageInfo());
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          this.pdfViewer?.nextPage().then(() => this.updatePageInfo());
+          break;
+        case 'Delete':
+        case 'Backspace':
+          e.preventDefault();
+          const selectedAnnotation = annotationStore.getStore().selectedAnnotation;
+          if (selectedAnnotation) {
+            annotationStore.deleteAnnotation(selectedAnnotation.id);
+          }
+          break;
+      }
+    }
   }
 }
 
