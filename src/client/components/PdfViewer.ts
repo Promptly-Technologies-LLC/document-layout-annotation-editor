@@ -323,27 +323,32 @@ export class PdfViewer {
     // Commit the final size and position to the store for resize operations
     if (this.isResizing && this.resizeOverlay && this.activeAnnotation) {
       // Get final coordinates from overlay
-      const finalRect = {
-        left: parseFloat(this.resizeOverlay.style.left),
-        top: parseFloat(this.resizeOverlay.style.top),
-        width: parseFloat(this.resizeOverlay.style.width),
-        height: parseFloat(this.resizeOverlay.style.height)
-      };
+      const finalLeft = parseFloat(this.resizeOverlay.style.left);
+      const finalTop = parseFloat(this.resizeOverlay.style.top);
+      const finalWidth = parseFloat(this.resizeOverlay.style.width);
+      const finalHeight = parseFloat(this.resizeOverlay.style.height);
 
       // Remove overlay
       this.overlay.removeChild(this.resizeOverlay);
       this.resizeOverlay = null;
 
-      // Update annotation with normalized coordinates
-      const scaleX = this.canvas.width / this.activeAnnotation.page_width;
-      const scaleY = this.canvas.height / this.activeAnnotation.page_height;
-      
-      annotationStore.updateAnnotation(this.activeAnnotation.id, {
-        left: finalRect.left / scaleX,
-        top: finalRect.top / scaleY,
-        width: finalRect.width / scaleX,
-        height: finalRect.height / scaleY,
-      });
+      // Validate dimensions before update
+      if (isNaN(finalLeft) || isNaN(finalTop) || 
+          isNaN(finalWidth) || isNaN(finalHeight) ||
+          finalWidth <= 0 || finalHeight <= 0) {
+        console.warn('Invalid resize dimensions. Update skipped.');
+      } else {
+        // Update annotation with normalized coordinates
+        const scaleX = this.canvas.width / this.activeAnnotation.page_width;
+        const scaleY = this.canvas.height / this.activeAnnotation.page_height;
+        
+        annotationStore.updateAnnotation(this.activeAnnotation.id, {
+          left: finalLeft / scaleX,
+          top: finalTop / scaleY,
+          width: finalWidth / scaleX,
+          height: finalHeight / scaleY,
+        });
+      }
     }
     
     this.isCreatingAnnotation = false;
@@ -454,6 +459,15 @@ export class PdfViewer {
   private createResizeOverlay(): void {
     this.resizeOverlay = document.createElement('div');
     this.resizeOverlay.className = 'resize-overlay absolute border-2 border-dashed border-blue-500 bg-blue-100 bg-opacity-20 pointer-events-none';
+    
+    // Initialize with current dimensions
+    if (this.resizeStartBounds) {
+      this.resizeOverlay.style.left = `${this.resizeStartBounds.left}px`;
+      this.resizeOverlay.style.top = `${this.resizeStartBounds.top}px`;
+      this.resizeOverlay.style.width = `${this.resizeStartBounds.width}px`;
+      this.resizeOverlay.style.height = `${this.resizeStartBounds.height}px`;
+    }
+    
     this.overlay.appendChild(this.resizeOverlay);
   }
 
