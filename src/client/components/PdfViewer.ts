@@ -23,6 +23,7 @@ export class PdfViewer {
     selectionStart: number;
     selectionEnd: number;
   } | null = null;
+  private uiState = new Map<string, { textCollapsed: boolean; typeCollapsed: boolean }>();
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -31,6 +32,19 @@ export class PdfViewer {
     
     this.setupElements();
     this.setupEventListeners();
+  }
+
+  private makeToggle(
+    collapsed: boolean,
+    onToggle: () => void
+  ): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.className = 'toggle-btn';
+    btn.innerHTML = collapsed ? '+' : '−';
+    btn.title = collapsed ? 'Expand' : 'Collapse';
+    btn.addEventListener('mousedown', e => e.stopPropagation()); // keep drag logic intact
+    btn.addEventListener('click', e => { e.stopPropagation(); onToggle(); });
+    return btn;
   }
 
   private setupElements(): void {
@@ -86,6 +100,10 @@ export class PdfViewer {
   }
 
   private renderAnnotations(): void {
+    // Memory clean-up: remove UI state for deleted annotations
+    const alive = new Set(annotationStore.getStore().annotations.map(a => a.id));
+    for (const id of this.uiState.keys()) if (!alive.has(id)) this.uiState.delete(id);
+    
     const activeElement = document.activeElement;
     if (activeElement?.classList.contains('text-input')) {
       const annotationBox = (activeElement as HTMLElement).closest('.annotation-box') as HTMLElement;
@@ -134,6 +152,12 @@ export class PdfViewer {
   }
 
   private createAnnotationElement(annotation: Annotation): HTMLElement {
+    // Ensure we have UI state for this annotation
+    if (!this.uiState.has(annotation.id)) {
+      this.uiState.set(annotation.id, { textCollapsed: false, typeCollapsed: false });
+    }
+    const state = this.uiState.get(annotation.id)!;
+    
     const box = document.createElement('div');
     box.className = 'annotation-box absolute border-2 border-blue-500 bg-blue-100 bg-opacity-20 cursor-move';
     box.dataset.annotationId = annotation.id;
@@ -181,6 +205,13 @@ export class PdfViewer {
       <option value="Caption" ${annotation.type === 'Caption' ? 'selected' : ''}>Caption</option>
     `;
     
+    if (state.typeCollapsed) select.classList.add('collapsed');
+    
+    const typeTgl = this.makeToggle(state.typeCollapsed, () => {
+      state.typeCollapsed = !state.typeCollapsed;
+      this.renderAnnotations();     // quickest way to refresh UI
+    });
+    
     select.addEventListener('change', (e) => {
       const target = e.target as HTMLSelectElement;
       annotationStore.updateAnnotation(annotation.id, { type: target.value as any });
@@ -189,6 +220,8 @@ export class PdfViewer {
     // Prevent mousedown from bubbling up to the annotation box handler
     select.addEventListener('mousedown', e => e.stopPropagation());
     
+    select.style.marginLeft = '4px';        // small gap
+    box.appendChild(typeTgl);
     box.appendChild(select);
     
     // Add delete button
@@ -220,12 +253,25 @@ export class PdfViewer {
     textArea.style.overflow = 'hidden';
     textArea.style.transition = 'height 0.2s ease';
     
+    if (state.textCollapsed) textArea.classList.add('collapsed');
+    
+    const textTgl = this.makeToggle(state.textCollapsed, () => {
+      state.textCollapsed = !state.textCollapsed;
+      this.renderAnnotations();
+    });
+    
     textArea.addEventListener('focus', () => {
-      textArea.style.height = 'auto';
-      const newHeight = Math.min(textArea.scrollHeight, 150);
-      textArea.style.height = `${newHeight}px`;
-      textArea.style.overflowY = 'auto';
-      textArea.style.zIndex = '1001';
+      if (state.textCollapsed) {
+        state.textCollapsed = false;
+        this.renderAnnotations();
+        // focus will be restored automatically on next render
+      } else {
+        textArea.style.height = 'auto';
+        const newHeight = Math.min(textArea.scrollHeight, 150);
+        textArea.style.height = `${newHeight}px`;
+        textArea.style.overflowY = 'auto';
+        textArea.style.zIndex = '1001';
+      }
     });
     
     textArea.addEventListener('blur', () => {
@@ -246,6 +292,8 @@ export class PdfViewer {
     // Prevent mousedown from bubbling up to the annotation box handler
     textArea.addEventListener('mousedown', e => e.stopPropagation());
     
+    textArea.style.marginLeft = '4px';
+    box.appendChild(textTgl);
     box.appendChild(textArea);
     
     // Event listeners

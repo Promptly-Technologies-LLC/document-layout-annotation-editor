@@ -80,6 +80,24 @@
     z-index: 1001;
     box-shadow: 0 0 0 2px theme('colors.primary.500');
   }
+
+  .toggle-btn {
+    @apply w-4 h-4 flex items-center justify-center bg-gray-200 text-gray-600 rounded text-xs leading-none
+           hover:bg-gray-300 focus:outline-none;
+    z-index: 1001;
+  }
+
+  /* collapsed look for both select & textarea */
+  .collapsed {
+    width: 20px !important;
+    min-width: 20px !important;
+    height: 20px !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    border-style: dashed !important;
+    cursor: pointer;
+    text-indent: -9999px; /* hides text but keeps value */
+  }
 }
 
 @layer utilities {
