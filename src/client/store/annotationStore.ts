@@ -62,7 +62,16 @@ export class AnnotationStoreManager {
   updateAnnotation(id: string, updates: Partial<Annotation>): void {
     const index = this.store.annotations.findIndex(a => a.id === id);
     if (index !== -1) {
-      this.store.annotations[index] = { ...this.store.annotations[index], ...updates };
+      // Ensure positive width/height regardless of drag direction
+      const normalizedUpdates = { ...updates };
+      if (updates.width !== undefined) {
+        normalizedUpdates.width = Math.abs(updates.width);
+      }
+      if (updates.height !== undefined) {
+        normalizedUpdates.height = Math.abs(updates.height);
+      }
+      
+      this.store.annotations[index] = { ...this.store.annotations[index], ...normalizedUpdates };
       this.store.isDirty = true;
       this.scheduleAutoSave();
       this.notify();

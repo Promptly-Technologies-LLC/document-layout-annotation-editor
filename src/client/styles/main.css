@@ -54,6 +54,12 @@
   .resize-handle.sw { @apply -bottom-1 -left-1 cursor-sw-resize; }
   .resize-handle.se { @apply -bottom-1 -right-1 cursor-se-resize; }
 
+  .resize-overlay {
+    @apply absolute border-2 border-dashed border-blue-500 bg-blue-100 bg-opacity-20 pointer-events-none;
+    z-index: 100;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+  }
+
   .annotation-dropdown {
     @apply absolute bg-white border border-gray-300 rounded-md shadow-lg text-sm z-50;
   }

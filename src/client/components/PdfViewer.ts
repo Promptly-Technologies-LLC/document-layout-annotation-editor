@@ -15,8 +15,9 @@ export class PdfViewer {
   private dragOffset: { x: number; y: number } = { x: 0, y: 0 };
   private selectionBox: HTMLElement | null = null;
   private activeAnnotation: Annotation | null = null;
-  private resizeHandle: string = '';
   private resizeStartBounds: { left: number; top: number; width: number; height: number } | null = null;
+  private oppositeCorner: { x: number; y: number } | null = null;
+  private resizeOverlay: HTMLElement | null = null;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -115,6 +116,7 @@ export class PdfViewer {
     ['nw', 'ne', 'sw', 'se'].forEach(handle => {
       const handleEl = document.createElement('div');
       handleEl.className = `resize-handle ${handle} absolute w-2 h-2 bg-blue-500`;
+      handleEl.dataset.handle = handle; // Store handle type
       
       if (handle === 'nw') handleEl.style.cssText = 'top: -1px; left: -1px; cursor: nw-resize;';
       if (handle === 'ne') handleEl.style.cssText = 'top: -1px; right: -1px; cursor: ne-resize;';
@@ -256,20 +258,28 @@ export class PdfViewer {
     }
 
     // Commit the final size and position to the store for resize operations
-    if (this.isResizing && this.selectedBox && this.activeAnnotation) {
-      const newLeftPx = parseFloat(this.selectedBox.style.left);
-      const newTopPx = parseFloat(this.selectedBox.style.top);
-      const newWidthPx = parseFloat(this.selectedBox.style.width);
-      const newHeightPx = parseFloat(this.selectedBox.style.height);
-      
+    if (this.isResizing && this.resizeOverlay && this.activeAnnotation) {
+      // Get final coordinates from overlay
+      const finalRect = {
+        left: parseFloat(this.resizeOverlay.style.left),
+        top: parseFloat(this.resizeOverlay.style.top),
+        width: parseFloat(this.resizeOverlay.style.width),
+        height: parseFloat(this.resizeOverlay.style.height)
+      };
+
+      // Remove overlay
+      this.overlay.removeChild(this.resizeOverlay);
+      this.resizeOverlay = null;
+
+      // Update annotation with normalized coordinates
       const scaleX = this.canvas.width / this.activeAnnotation.page_width;
       const scaleY = this.canvas.height / this.activeAnnotation.page_height;
       
       annotationStore.updateAnnotation(this.activeAnnotation.id, {
-        left: newLeftPx / scaleX,
-        top: newTopPx / scaleY,
-        width: newWidthPx / scaleX,
-        height: newHeightPx / scaleY,
+        left: finalRect.left / scaleX,
+        top: finalRect.top / scaleY,
+        width: finalRect.width / scaleX,
+        height: finalRect.height / scaleY,
       });
     }
     
@@ -278,8 +288,12 @@ export class PdfViewer {
     this.isResizing = false;
     this.activeAnnotation = null;
     this.selectedBox = null;
-    this.resizeHandle = '';
     this.resizeStartBounds = null;
+    this.oppositeCorner = null;
+    if (this.resizeOverlay) {
+      this.overlay.removeChild(this.resizeOverlay);
+      this.resizeOverlay = null;
+    }
   }
 
   private finishCreatingAnnotation(event: MouseEvent): void {
@@ -354,7 +368,6 @@ export class PdfViewer {
     this.activeAnnotation = annotation;
     // Get the parent annotation box instead of the resize handle
     this.selectedBox = (event.target as HTMLElement).parentElement as HTMLElement;
-    this.resizeHandle = handle;
     
     // Store the initial bounds for resize calculations
     this.resizeStartBounds = {
@@ -363,6 +376,22 @@ export class PdfViewer {
       width: parseFloat(this.selectedBox.style.width),
       height: parseFloat(this.selectedBox.style.height),
     };
+    
+    // Store opposite corner coordinates based on handle
+    const bounds = this.resizeStartBounds;
+    this.oppositeCorner = {
+      x: handle.includes('e') ? bounds.left : bounds.left + bounds.width,
+      y: handle.includes('s') ? bounds.top : bounds.top + bounds.height
+    };
+    
+    // Create resize overlay
+    this.createResizeOverlay();
+  }
+
+  private createResizeOverlay(): void {
+    this.resizeOverlay = document.createElement('div');
+    this.resizeOverlay.className = 'resize-overlay absolute border-2 border-dashed border-blue-500 bg-blue-100 bg-opacity-20 pointer-events-none';
+    this.overlay.appendChild(this.resizeOverlay);
   }
 
   private updateDraggingAnnotation(event: MouseEvent): void {
@@ -377,65 +406,47 @@ export class PdfViewer {
   }
 
   private updateResizingAnnotation(event: MouseEvent): void {
-    if (!this.isResizing || !this.selectedBox || !this.resizeStartBounds) return;
+    if (!this.isResizing || !this.selectedBox || !this.oppositeCorner || !this.resizeOverlay) return;
 
     const rect = this.overlay.getBoundingClientRect();
     const mouseX = event.clientX - rect.left;
     const mouseY = event.clientY - rect.top;
 
-    let newLeft = this.resizeStartBounds.left;
-    let newTop = this.resizeStartBounds.top;
-    let newWidth = this.resizeStartBounds.width;
-    let newHeight = this.resizeStartBounds.height;
+    // Calculate new rectangle coordinates (allow coordinate swapping)
+    const newRect = {
+      left: Math.min(this.oppositeCorner.x, mouseX),
+      top: Math.min(this.oppositeCorner.y, mouseY),
+      right: Math.max(this.oppositeCorner.x, mouseX),
+      bottom: Math.max(this.oppositeCorner.y, mouseY)
+    };
 
-    // Update dimensions based on which resize handle is being used
-    switch (this.resizeHandle) {
-      case 'nw': // Northwest
-        newLeft = mouseX;
-        newTop = mouseY;
-        newWidth = this.resizeStartBounds.left + this.resizeStartBounds.width - mouseX;
-        newHeight = this.resizeStartBounds.top + this.resizeStartBounds.height - mouseY;
-        break;
-      case 'ne': // Northeast
-        newTop = mouseY;
-        newWidth = mouseX - this.resizeStartBounds.left;
-        newHeight = this.resizeStartBounds.top + this.resizeStartBounds.height - mouseY;
-        break;
-      case 'sw': // Southwest
-        newLeft = mouseX;
-        newWidth = this.resizeStartBounds.left + this.resizeStartBounds.width - mouseX;
-        newHeight = mouseY - this.resizeStartBounds.top;
-        break;
-      case 'se': // Southeast
-        newWidth = mouseX - this.resizeStartBounds.left;
-        newHeight = mouseY - this.resizeStartBounds.top;
-        break;
-    }
+    // Convert to width/height format
+    const width = newRect.right - newRect.left;
+    const height = newRect.bottom - newRect.top;
 
     // Ensure minimum dimensions
     const minSize = 10;
-    if (newWidth < minSize) {
-      if (this.resizeHandle.includes('w')) {
-        newLeft = this.resizeStartBounds.left + this.resizeStartBounds.width - minSize;
-      }
-      newWidth = minSize;
-    }
-    if (newHeight < minSize) {
-      if (this.resizeHandle.includes('n')) {
-        newTop = this.resizeStartBounds.top + this.resizeStartBounds.height - minSize;
-      }
-      newHeight = minSize;
+    if (width < minSize || height < minSize) {
+      return; // Don't update if too small
     }
 
     // Ensure bounds stay within the overlay
-    newLeft = Math.max(0, Math.min(newLeft, this.overlay.offsetWidth - newWidth));
-    newTop = Math.max(0, Math.min(newTop, this.overlay.offsetHeight - newHeight));
+    const finalLeft = Math.max(0, Math.min(newRect.left, this.overlay.offsetWidth - width));
+    const finalTop = Math.max(0, Math.min(newRect.top, this.overlay.offsetHeight - height));
+    const finalWidth = Math.min(width, this.overlay.offsetWidth - finalLeft);
+    const finalHeight = Math.min(height, this.overlay.offsetHeight - finalTop);
 
-    // Apply the new bounds
-    this.selectedBox.style.left = `${newLeft}px`;
-    this.selectedBox.style.top = `${newTop}px`;
-    this.selectedBox.style.width = `${newWidth}px`;
-    this.selectedBox.style.height = `${newHeight}px`;
+    // Update overlay preview
+    this.resizeOverlay.style.left = `${finalLeft}px`;
+    this.resizeOverlay.style.top = `${finalTop}px`;
+    this.resizeOverlay.style.width = `${finalWidth}px`;
+    this.resizeOverlay.style.height = `${finalHeight}px`;
+
+    // Update selected box (live preview)
+    this.selectedBox.style.left = `${finalLeft}px`;
+    this.selectedBox.style.top = `${finalTop}px`;
+    this.selectedBox.style.width = `${finalWidth}px`;
+    this.selectedBox.style.height = `${finalHeight}px`;
   }
 
   getCurrentPage(): number {
