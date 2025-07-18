@@ -4,8 +4,11 @@ export class PdfService {
   private pdf: pdfjsLib.PDFDocumentProxy | null = null;
 
   constructor() {
-    // Configure PDF.js worker
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    // Configure PDF.js worker to use local worker file
+    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+      'pdfjs-dist/build/pdf.worker.min.mjs',
+      import.meta.url
+    ).toString();
   }
 
   async loadPdf(url: string): Promise<void> {

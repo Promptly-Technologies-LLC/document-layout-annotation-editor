@@ -20,4 +20,10 @@ export default defineConfig({
       '/output': 'http://localhost:3001',
     },
   },
+  optimizeDeps: {
+    exclude: ['pdfjs-dist'],
+  },
+  worker: {
+    format: 'es',
+  },
 });

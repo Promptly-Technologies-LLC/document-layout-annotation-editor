@@ -13,6 +13,7 @@ export class PdfViewer {
   private isDragging: boolean = false;
   private isResizing: boolean = false;
   private dragOffset: { x: number; y: number } = { x: 0, y: 0 };
+  private selectionBox: HTMLElement | null = null;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -73,18 +74,25 @@ export class PdfViewer {
     const annotations = annotationStore.getStore().annotations;
     const pageAnnotations = annotations.filter(a => a.page_number === this.currentPage);
     
+    console.log('Rendering annotations for page', this.currentPage, pageAnnotations);
+    
     pageAnnotations.forEach(annotation => {
-      this.createAnnotationElement(annotation);
+      const annotationElement = this.createAnnotationElement(annotation);
+      this.overlay.appendChild(annotationElement);
     });
   }
 
   private createAnnotationElement(annotation: Annotation): HTMLElement {
     const box = document.createElement('div');
-    box.className = 'annotation-box';
+    box.className = 'annotation-box absolute border-2 border-blue-500 bg-blue-100 bg-opacity-20 cursor-move';
     box.dataset.annotationId = annotation.id;
     
-    const scaleX = this.canvas.width / annotation.page_width;
-    const scaleY = this.canvas.height / annotation.page_height;
+    // Use the canvas dimensions as a fallback if page dimensions are missing from the annotation data
+    const page_width = annotation.page_width || this.canvas.width;
+    const page_height = annotation.page_height || this.canvas.height;
+    
+    const scaleX = this.canvas.width / page_width;
+    const scaleY = this.canvas.height / page_height;
     
     box.style.left = `${annotation.left * scaleX}px`;
     box.style.top = `${annotation.top * scaleY}px`;
@@ -93,14 +101,20 @@ export class PdfViewer {
     
     // Add label
     const label = document.createElement('div');
-    label.className = 'annotation-label';
+    label.className = 'annotation-label absolute -top-6 left-0 bg-blue-500 text-white px-2 py-1 rounded text-xs';
     label.textContent = annotation.type;
     box.appendChild(label);
     
     // Add resize handles
     ['nw', 'ne', 'sw', 'se'].forEach(handle => {
       const handleEl = document.createElement('div');
-      handleEl.className = `resize-handle ${handle}`;
+      handleEl.className = `resize-handle ${handle} absolute w-2 h-2 bg-blue-500`;
+      
+      if (handle === 'nw') handleEl.style.cssText = 'top: -1px; left: -1px; cursor: nw-resize;';
+      if (handle === 'ne') handleEl.style.cssText = 'top: -1px; right: -1px; cursor: ne-resize;';
+      if (handle === 'sw') handleEl.style.cssText = 'bottom: -1px; left: -1px; cursor: sw-resize;';
+      if (handle === 'se') handleEl.style.cssText = 'bottom: -1px; right: -1px; cursor: se-resize;';
+      
       box.appendChild(handleEl);
     });
     
@@ -108,16 +122,17 @@ export class PdfViewer {
     const select = document.createElement('select');
     select.className = 'absolute -top-8 right-0 bg-white border border-gray-300 rounded px-2 py-1 text-xs';
     select.innerHTML = `
-      <option value="text" ${annotation.type === 'text' ? 'selected' : ''}>Text</option>
-      <option value="image" ${annotation.type === 'image' ? 'selected' : ''}>Image</option>
-      <option value="table" ${annotation.type === 'table' ? 'selected' : ''}>Table</option>
-      <option value="figure" ${annotation.type === 'figure' ? 'selected' : ''}>Figure</option>
-      <option value="header" ${annotation.type === 'header' ? 'selected' : ''}>Header</option>
-      <option value="footer" ${annotation.type === 'footer' ? 'selected' : ''}>Footer</option>
-      <option value="title" ${annotation.type === 'title' ? 'selected' : ''}>Title</option>
-      <option value="paragraph" ${annotation.type === 'paragraph' ? 'selected' : ''}>Paragraph</option>
-      <option value="list" ${annotation.type === 'list' ? 'selected' : ''}>List</option>
-      <option value="other" ${annotation.type === 'other' ? 'selected' : ''}>Other</option>
+      <option value="Text" ${annotation.type === 'Text' ? 'selected' : ''}>Text</option>
+      <option value="Title" ${annotation.type === 'Title' ? 'selected' : ''}>Title</option>
+      <option value="Section header" ${annotation.type === 'Section header' ? 'selected' : ''}>Section header</option>
+      <option value="Picture" ${annotation.type === 'Picture' ? 'selected' : ''}>Picture</option>
+      <option value="Table" ${annotation.type === 'Table' ? 'selected' : ''}>Table</option>
+      <option value="List item" ${annotation.type === 'List item' ? 'selected' : ''}>List item</option>
+      <option value="Formula" ${annotation.type === 'Formula' ? 'selected' : ''}>Formula</option>
+      <option value="Footnote" ${annotation.type === 'Footnote' ? 'selected' : ''}>Footnote</option>
+      <option value="Page header" ${annotation.type === 'Page header' ? 'selected' : ''}>Page header</option>
+      <option value="Page footer" ${annotation.type === 'Page footer' ? 'selected' : ''}>Page footer</option>
+      <option value="Caption" ${annotation.type === 'Caption' ? 'selected' : ''}>Caption</option>
     `;
     
     select.addEventListener('change', (e) => {
@@ -146,11 +161,32 @@ export class PdfViewer {
       y: event.clientY - rect.top,
     };
     this.isCreatingAnnotation = true;
+    
+    // Create selection box for visual feedback
+    this.selectionBox = document.createElement('div');
+    this.selectionBox.className = 'absolute border-2 border-dashed border-primary-500 bg-primary-100 bg-opacity-20 pointer-events-none';
+    this.selectionBox.style.left = `${this.startPoint.x}px`;
+    this.selectionBox.style.top = `${this.startPoint.y}px`;
+    this.selectionBox.style.width = '0px';
+    this.selectionBox.style.height = '0px';
+    this.overlay.appendChild(this.selectionBox);
   }
 
   private handleMouseMove(event: MouseEvent): void {
-    if (this.isCreatingAnnotation && this.startPoint) {
-      // TODO: Implement visual feedback for annotation creation
+    if (this.isCreatingAnnotation && this.startPoint && this.selectionBox) {
+      const rect = this.overlay.getBoundingClientRect();
+      const currentX = event.clientX - rect.left;
+      const currentY = event.clientY - rect.top;
+      
+      const left = Math.min(this.startPoint.x, currentX);
+      const top = Math.min(this.startPoint.y, currentY);
+      const width = Math.abs(currentX - this.startPoint.x);
+      const height = Math.abs(currentY - this.startPoint.y);
+      
+      this.selectionBox.style.left = `${left}px`;
+      this.selectionBox.style.top = `${top}px`;
+      this.selectionBox.style.width = `${width}px`;
+      this.selectionBox.style.height = `${height}px`;
     } else if (this.isDragging && this.selectedBox) {
       this.updateDraggingAnnotation(event);
     } else if (this.isResizing && this.selectedBox) {
@@ -168,6 +204,11 @@ export class PdfViewer {
   }
 
   private finishCreatingAnnotation(event: MouseEvent): void {
+    if (this.selectionBox) {
+      this.overlay.removeChild(this.selectionBox);
+      this.selectionBox = null;
+    }
+    
     const rect = this.overlay.getBoundingClientRect();
     const endX = event.clientX - rect.left;
     const endY = event.clientY - rect.top;
@@ -179,15 +220,15 @@ export class PdfViewer {
     
     if (width > 10 && height > 10) {
       const annotation: Omit<Annotation, 'id'> = {
-        left: left / this.canvas.width * 100,
-        top: top / this.canvas.height * 100,
-        width: width / this.canvas.width * 100,
-        height: height / this.canvas.height * 100,
+        left: left,
+        top: top,
+        width: width,
+        height: height,
         page_number: this.currentPage,
-        page_width: 100,
-        page_height: 100,
+        page_width: this.canvas.width,
+        page_height: this.canvas.height,
         text: '',
-        type: 'text',
+        type: 'Text',
       };
       
       annotationStore.addAnnotation(annotation);
@@ -212,8 +253,8 @@ export class PdfViewer {
     this.isDragging = true;
     const rect = this.overlay.getBoundingClientRect();
     this.dragOffset = {
-      x: event.clientX - rect.left - (annotation.left * this.canvas.width / 100),
-      y: event.clientY - rect.top - (annotation.top * this.canvas.height / 100),
+      x: event.clientX - rect.left - (annotation.left * this.canvas.width / annotation.page_width),
+      y: event.clientY - rect.top - (annotation.top * this.canvas.height / annotation.page_height),
     };
   }
 
@@ -229,13 +270,11 @@ export class PdfViewer {
     const annotation = annotationStore.getStore().selectedAnnotation;
     if (annotation) {
       annotationStore.updateAnnotation(annotation.id, {
-        left: Math.max(0, Math.min(x / this.canvas.width * 100, 100 - annotation.width)),
-        top: Math.max(0, Math.min(y / this.canvas.height * 100, 100 - annotation.height)),
+        left: Math.max(0, Math.min(x, annotation.page_width - annotation.width)),
+        top: Math.max(0, Math.min(y, annotation.page_height - annotation.height)),
       });
     }
   }
-
-  
 
   getCurrentPage(): number {
     return this.currentPage;

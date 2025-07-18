@@ -1,7 +1,7 @@
 import { PdfViewer } from './components/PdfViewer.js';
 import { FileManager } from './components/FileManager.js';
 import { annotationStore } from './store/annotationStore.js';
-// import { apiService } from './services/api.js';
+import { pdfService } from './services/pdfService.js';
 
 class App {
   private pdfViewer: PdfViewer | null = null;
@@ -93,6 +93,13 @@ class App {
     saveBtn.addEventListener('click', () => this.saveAnnotations());
     prevBtn.addEventListener('click', () => this.pdfViewer?.prevPage());
     nextBtn.addEventListener('click', () => this.pdfViewer?.nextPage());
+    
+    // Auto-save event listener
+    window.addEventListener('autoSaveRequested', () => {
+      if (this.currentJson && annotationStore.getStore().isDirty) {
+        this.saveAnnotations();
+      }
+    });
   }
 
   private setupStoreSubscription(): void {
@@ -113,8 +120,10 @@ class App {
   }
 
   private async handlePdfSelected(filename: string): Promise<void> {
+    console.log('Loading PDF:', filename);
     try {
       await this.pdfViewer?.loadPdf(`/pdfs/${filename}`);
+      console.log('PDF loaded successfully');
       this.updatePageInfo();
     } catch (error) {
       console.error('Failed to load PDF:', error);
@@ -150,7 +159,7 @@ class App {
     const nextBtn = document.getElementById('next-page')!;
 
     const currentPage = this.pdfViewer?.getCurrentPage() || 1;
-    const totalPages = 10; // This should come from pdfService
+    const totalPages = pdfService.getTotalPages();
     
     pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
     (prevBtn as HTMLButtonElement).disabled = currentPage <= 1;
@@ -161,4 +170,13 @@ class App {
 // Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
   new App();
+});
+
+// Global error handlers
+window.addEventListener('error', (event) => {
+  console.error('Global error:', event.error);
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('Unhandled promise rejection:', event.reason);
 });

@@ -119,7 +119,8 @@ export class AnnotationStoreManager {
     }
 
     this.saveTimeout = setTimeout(() => {
-      // Auto-save would need filename - handled by component
+      // Emit auto-save event
+      window.dispatchEvent(new CustomEvent('autoSaveRequested'));
     }, 2000);
   }
 

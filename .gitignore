@@ -72,3 +72,7 @@ Thumbs.db
 # PDF and JSON files (user data)
 pdfs/
 output/
+
+# AI files
+repomix-output.xml
+CLAUDE.md

@@ -1,14 +1,15 @@
 export type AnnotationType = 
-  | 'text'
-  | 'image'
-  | 'table'
-  | 'figure'
-  | 'header'
-  | 'footer'
-  | 'title'
-  | 'paragraph'
-  | 'list'
-  | 'other';
+  | 'Title'
+  | 'Section header'
+  | 'Text'
+  | 'Picture'
+  | 'Table'
+  | 'List item'
+  | 'Formula'
+  | 'Footnote'
+  | 'Page header'
+  | 'Page footer'
+  | 'Caption';
 
 export interface Annotation {
   id: string;

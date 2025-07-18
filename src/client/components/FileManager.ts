@@ -72,8 +72,10 @@ export class FileManager {
   }
 
   async loadFiles(): Promise<void> {
+    console.log('Loading files from server...');
     try {
       const files = await apiService.getFiles();
+      console.log('Files loaded:', files);
       this.populateSelects(files);
       this.events.onFilesRefreshed(files);
     } catch (error) {
