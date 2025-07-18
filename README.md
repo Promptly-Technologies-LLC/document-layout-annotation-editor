@@ -1,6 +1,8 @@
-# PDF Annotation Editor v2.0
+# Document Layout Annotation Editor
 
 A modern, feature-rich PDF annotation editor built with TypeScript, Express, and Vite. This application allows users to view PDF documents and create/edit annotations with a clean, responsive interface.
+
+Intended for use in creating datasets for fine-tuning the [Huridocs PDF Document Layout Analysis](https://github.com/huridocs/pdf-document-layout-analysis) model.
 
 ## Features
 

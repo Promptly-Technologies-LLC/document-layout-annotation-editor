@@ -1,5 +1,5 @@
 {
-  "name": "pdf-annotation-editor",
+  "name": "document-layout-annotation-editor",
   "version": "2.0.0",
   "description": "A modern PDF annotation editor with TypeScript, Tailwind CSS, and improved architecture",
   "type": "module",
