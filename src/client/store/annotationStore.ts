@@ -20,6 +20,7 @@ export class AnnotationStoreManager {
 
   private listeners: Array<(store: AnnotationStore) => void> = [];
   private saveTimeout: NodeJS.Timeout | null = null;
+  private textUpdateTimeouts: Map<string, NodeJS.Timeout> = new Map();
 
   subscribe(listener: (store: AnnotationStore) => void): () => void {
     this.listeners.push(listener);
@@ -59,7 +60,7 @@ export class AnnotationStoreManager {
     return newAnnotation;
   }
 
-  updateAnnotation(id: string, updates: Partial<Annotation>): void {
+  updateAnnotation(id: string, updates: Partial<Annotation>, skipRender: boolean = false): void {
     const index = this.store.annotations.findIndex(a => a.id === id);
     if (index !== -1) {
       // Ensure positive width/height regardless of drag direction
@@ -74,8 +75,31 @@ export class AnnotationStoreManager {
       this.store.annotations[index] = { ...this.store.annotations[index], ...normalizedUpdates };
       this.store.isDirty = true;
       this.scheduleAutoSave();
-      this.notify();
+      if (!skipRender) {
+        this.notify();
+      }
     }
+  }
+
+  debounceTextUpdate(annotationId: string, text: string): void {
+    if (this.textUpdateTimeouts.has(annotationId)) {
+      clearTimeout(this.textUpdateTimeouts.get(annotationId));
+    }
+    
+    const timeout = setTimeout(() => {
+      this.updateAnnotation(annotationId, { text }, true);
+      this.textUpdateTimeouts.delete(annotationId);
+    }, 500);
+    
+    this.textUpdateTimeouts.set(annotationId, timeout);
+  }
+
+  flushTextUpdate(annotationId: string, text: string): void {
+    if (this.textUpdateTimeouts.has(annotationId)) {
+      clearTimeout(this.textUpdateTimeouts.get(annotationId));
+      this.textUpdateTimeouts.delete(annotationId);
+    }
+    this.updateAnnotation(annotationId, { text }, true);
   }
 
   deleteAnnotation(id: string): void {

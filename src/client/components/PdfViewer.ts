@@ -18,6 +18,11 @@ export class PdfViewer {
   private resizeStartBounds: { left: number; top: number; width: number; height: number } | null = null;
   private oppositeCorner: { x: number; y: number } | null = null;
   private resizeOverlay: HTMLElement | null = null;
+  private restoreFocus: {
+    annotationId: string;
+    selectionStart: number;
+    selectionEnd: number;
+  } | null = null;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -81,8 +86,25 @@ export class PdfViewer {
   }
 
   private renderAnnotations(): void {
-    // Clear existing annotations
-    this.overlay.querySelectorAll('.annotation-box').forEach(el => el.remove());
+    const activeElement = document.activeElement;
+    if (activeElement?.classList.contains('text-input')) {
+      const annotationBox = (activeElement as HTMLElement).closest('.annotation-box') as HTMLElement;
+      const annotationId = annotationBox?.dataset.annotationId;
+      if (annotationId) {
+        this.restoreFocus = {
+          annotationId,
+          selectionStart: (activeElement as HTMLTextAreaElement).selectionStart || 0,
+          selectionEnd: (activeElement as HTMLTextAreaElement).selectionEnd || 0
+        };
+      }
+    }
+    
+    // Clear existing annotations safely
+    this.overlay.querySelectorAll('.annotation-box').forEach(el => {
+      if (el.parentNode === this.overlay) {
+        el.remove();
+      }
+    });
     
     const annotations = annotationStore.getStore().annotations;
     const pageAnnotations = annotations.filter(a => a.page_number === this.currentPage);
@@ -93,6 +115,22 @@ export class PdfViewer {
       const annotationElement = this.createAnnotationElement(annotation);
       this.overlay.appendChild(annotationElement);
     });
+
+    if (this.restoreFocus) {
+      const annotationBox = this.overlay.querySelector(
+        `.annotation-box[data-annotation-id="${this.restoreFocus.annotationId}"]`
+      );
+      const textInput = annotationBox?.querySelector('.text-input');
+      
+      if (textInput) {
+        (textInput as HTMLTextAreaElement).focus();
+        (textInput as HTMLTextAreaElement).setSelectionRange(
+          this.restoreFocus.selectionStart,
+          this.restoreFocus.selectionEnd
+        );
+      }
+      this.restoreFocus = null;
+    }
   }
 
   private createAnnotationElement(annotation: Annotation): HTMLElement {
@@ -171,22 +209,45 @@ export class PdfViewer {
     box.appendChild(deleteBtn);
     
     // Add text input field
-    const textInput = document.createElement('input');
-    textInput.type = 'text';
-    textInput.value = annotation.text || '';
-    textInput.placeholder = 'Enter annotation text...';
-    textInput.className = 'text-input absolute -bottom-8 left-0 right-0 bg-white border border-gray-300 rounded px-2 py-1 text-xs';
-    textInput.style.zIndex = '1000';
+    const textArea = document.createElement('textarea');
+    textArea.value = annotation.text || '';
+    textArea.placeholder = 'Enter annotation text...';
+    textArea.className = 'text-input absolute left-0 right-0 bg-white border border-gray-300 rounded px-2 py-1 text-xs';
+    textArea.style.top = '100%';
+    textArea.style.marginTop = '0.5rem';
+    textArea.style.zIndex = '1000';
+    textArea.style.height = '1.5rem';
+    textArea.style.resize = 'none';
+    textArea.style.overflow = 'hidden';
+    textArea.style.transition = 'height 0.2s ease';
     
-    textInput.addEventListener('input', (e) => {
-      const target = e.target as HTMLInputElement;
-      annotationStore.updateAnnotation(annotation.id, { text: target.value });
+    textArea.addEventListener('focus', () => {
+      textArea.style.height = 'auto';
+      const newHeight = Math.min(textArea.scrollHeight, 150);
+      textArea.style.height = `${newHeight}px`;
+      textArea.style.overflowY = 'auto';
+      textArea.style.zIndex = '1001';
+    });
+    
+    textArea.addEventListener('blur', () => {
+      textArea.style.height = '1.5rem';
+      textArea.style.overflowY = 'hidden';
+      textArea.style.zIndex = '1000';
+      // Use setTimeout to avoid conflicts with the current render cycle
+      setTimeout(() => {
+        annotationStore.flushTextUpdate(annotation.id, textArea.value);
+      }, 0);
+    });
+    
+    textArea.addEventListener('input', (e) => {
+      const target = e.target as HTMLTextAreaElement;
+      annotationStore.debounceTextUpdate(annotation.id, target.value);
     });
     
     // Prevent mousedown from bubbling up to the annotation box handler
-    textInput.addEventListener('mousedown', e => e.stopPropagation());
+    textArea.addEventListener('mousedown', e => e.stopPropagation());
     
-    box.appendChild(textInput);
+    box.appendChild(textArea);
     
     // Event listeners
     box.addEventListener('mousedown', (e) => this.handleAnnotationMouseDown(e, annotation));

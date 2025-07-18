@@ -64,6 +64,22 @@
     @apply absolute bg-white border border-gray-300 rounded-md shadow-lg text-sm;
     z-index: 1000;
   }
+
+  .text-input {
+    min-width: 200px;
+    height: 1.5rem;
+    resize: none;
+    overflow: hidden;
+    transition: height 0.2s ease;
+    transform-origin: top;
+    @apply block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-xs;
+  }
+
+  .text-input:focus {
+    overflow-y: auto;
+    z-index: 1001;
+    box-shadow: 0 0 0 2px theme('colors.primary.500');
+  }
 }
 
 @layer utilities {
