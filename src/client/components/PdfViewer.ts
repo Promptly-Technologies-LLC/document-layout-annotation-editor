@@ -14,6 +14,7 @@ export class PdfViewer {
   private isResizing: boolean = false;
   private dragOffset: { x: number; y: number } = { x: 0, y: 0 };
   private selectionBox: HTMLElement | null = null;
+  private activeAnnotation: Annotation | null = null;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -108,12 +109,6 @@ export class PdfViewer {
     box.style.width = `${annotation.width * scaleX}px`;
     box.style.height = `${annotation.height * scaleY}px`;
     
-    // Add label
-    const label = document.createElement('div');
-    label.className = 'annotation-label absolute -top-6 left-0 bg-blue-500 text-white px-2 py-1 rounded text-xs';
-    label.textContent = annotation.type;
-    box.appendChild(label);
-    
     // Add resize handles
     ['nw', 'ne', 'sw', 'se'].forEach(handle => {
       const handleEl = document.createElement('div');
@@ -129,7 +124,7 @@ export class PdfViewer {
     
     // Add type selector
     const select = document.createElement('select');
-    select.className = 'absolute -top-8 right-0 bg-white border border-gray-300 rounded px-2 py-1 text-xs';
+    select.className = 'annotation-dropdown absolute -top-7 right-0 bg-white border border-gray-300 rounded px-2 py-1 text-xs z-10';
     select.innerHTML = `
       <option value="Text" ${annotation.type === 'Text' ? 'selected' : ''}>Text</option>
       <option value="Title" ${annotation.type === 'Title' ? 'selected' : ''}>Title</option>
@@ -207,9 +202,26 @@ export class PdfViewer {
     if (this.isCreatingAnnotation && this.startPoint) {
       this.finishCreatingAnnotation(event);
     }
+
+    // Commit the final position to the store and reset the state
+    if (this.isDragging && this.selectedBox && this.activeAnnotation) {
+      const newLeftPx = parseFloat(this.selectedBox.style.left);
+      const newTopPx = parseFloat(this.selectedBox.style.top);
+      
+      const scaleX = this.canvas.width / this.activeAnnotation.page_width;
+      const scaleY = this.canvas.height / this.activeAnnotation.page_height;
+      
+      annotationStore.updateAnnotation(this.activeAnnotation.id, {
+        left: newLeftPx / scaleX,
+        top: newTopPx / scaleY,
+      });
+    }
+    
     this.isCreatingAnnotation = false;
     this.isDragging = false;
     this.isResizing = false;
+    this.activeAnnotation = null;
+    this.selectedBox = null;
   }
 
   private finishCreatingAnnotation(event: MouseEvent): void {
@@ -260,10 +272,16 @@ export class PdfViewer {
 
   private startDragging(event: MouseEvent, annotation: Annotation): void {
     this.isDragging = true;
+    this.activeAnnotation = annotation;
+    this.selectedBox = event.currentTarget as HTMLElement;
+
     const rect = this.overlay.getBoundingClientRect();
+    const scaleX = this.canvas.width / annotation.page_width;
+    const scaleY = this.canvas.height / annotation.page_height;
+    
     this.dragOffset = {
-      x: event.clientX - rect.left - (annotation.left * this.canvas.width / annotation.page_width),
-      y: event.clientY - rect.top - (annotation.top * this.canvas.height / annotation.page_height),
+      x: event.clientX - rect.left - (annotation.left * scaleX),
+      y: event.clientY - rect.top - (annotation.top * scaleY),
     };
   }
 
@@ -272,17 +290,14 @@ export class PdfViewer {
   }
 
   private updateDraggingAnnotation(event: MouseEvent): void {
+    if (!this.isDragging || !this.selectedBox) return;
+
     const rect = this.overlay.getBoundingClientRect();
     const x = event.clientX - rect.left - this.dragOffset.x;
     const y = event.clientY - rect.top - this.dragOffset.y;
-    
-    const annotation = annotationStore.getStore().selectedAnnotation;
-    if (annotation) {
-      annotationStore.updateAnnotation(annotation.id, {
-        left: Math.max(0, Math.min(x, annotation.page_width - annotation.width)),
-        top: Math.max(0, Math.min(y, annotation.page_height - annotation.height)),
-      });
-    }
+
+    this.selectedBox.style.left = `${Math.max(0, x)}px`;
+    this.selectedBox.style.top = `${Math.max(0, y)}px`;
   }
 
   getCurrentPage(): number {

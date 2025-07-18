@@ -32,7 +32,9 @@ class App {
           </div>
         </header>
 
-        <div id="file-manager" class="border-b"></div>
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div id="file-manager" class="border-b"></div>
+        </div>
 
         <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div class="bg-white rounded-lg shadow">
@@ -91,8 +93,14 @@ class App {
     const nextBtn = document.getElementById('next-page')!;
 
     saveBtn.addEventListener('click', () => this.saveAnnotations());
-    prevBtn.addEventListener('click', () => this.pdfViewer?.prevPage());
-    nextBtn.addEventListener('click', () => this.pdfViewer?.nextPage());
+    prevBtn.addEventListener('click', async () => {
+      await this.pdfViewer?.prevPage();
+      this.updatePageInfo();
+    });
+    nextBtn.addEventListener('click', async () => {
+      await this.pdfViewer?.nextPage();
+      this.updatePageInfo();
+    });
     
     // Auto-save event listener
     window.addEventListener('autoSaveRequested', () => {

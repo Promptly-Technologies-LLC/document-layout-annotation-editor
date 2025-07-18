@@ -54,10 +54,6 @@
   .resize-handle.sw { @apply -bottom-1 -left-1 cursor-sw-resize; }
   .resize-handle.se { @apply -bottom-1 -right-1 cursor-se-resize; }
 
-  .annotation-label {
-    @apply absolute -top-8 left-0 bg-primary-700 text-white px-2 py-1 rounded text-xs whitespace-nowrap;
-  }
-
   .annotation-dropdown {
     @apply absolute bg-white border border-gray-300 rounded-md shadow-lg text-sm z-50;
   }
