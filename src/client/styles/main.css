@@ -60,26 +60,72 @@
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
   }
 
+  /* Interactive states for annotations */
+  .annotation-box.dragging {
+    @apply opacity-70;
+    z-index: 1000;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  }
+
+  .annotation-box.resizing {
+    @apply opacity-70;
+    z-index: 1000;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  }
+
+  .drag-preview {
+    @apply absolute border-2 border-dashed border-green-500 bg-green-100 bg-opacity-20 pointer-events-none;
+    z-index: 999;
+  }
+
+  .resize-preview {
+    @apply absolute border-2 border-dashed border-blue-500 bg-blue-100 bg-opacity-20 pointer-events-none;
+    z-index: 999;
+  }
+
   .annotation-dropdown {
-    @apply absolute bg-white border border-gray-300 rounded-md shadow-lg text-sm;
+    @apply absolute -top-7 right-0 bg-white border border-gray-300 rounded-md shadow-lg text-sm px-2 py-1;
+    z-index: 1000;
+    margin-left: 4px;
+  }
+
+  .delete-btn {
+    @apply absolute -top-7 -right-7 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600;
     z-index: 1000;
   }
 
+  .type-toggle {
+    @apply absolute top-0.5 right-0.5;
+    z-index: 1002;
+  }
+
+  .text-toggle {
+    @apply absolute bottom-0.5 left-0.5;
+    z-index: 1002;
+  }
+
   .text-input {
-    min-width: 200px;
+    @apply absolute left-0 right-0 bg-white border border-gray-300 rounded px-2 py-1 text-xs;
+    top: 100%;
+    z-index: 1000;
     height: 1.5rem;
     resize: none;
     overflow: hidden;
     transition: height 0.2s ease;
-    transform-origin: top;
-    @apply block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 text-xs;
+    margin-left: 4px;
+    min-width: 200px;
   }
 
   .text-input:focus {
     overflow-y: auto;
     z-index: 1001;
-    box-shadow: 0 0 0 2px theme('colors.primary.500');
   }
+
+  .seq-badge {
+    @apply absolute -bottom-7 -left-7 bg-primary-600 text-white text-xs w-6 h-6 flex items-center justify-center rounded-full;
+    z-index: 1000;
+  }
+
 
   .toggle-btn {
     @apply w-4 h-4 flex items-center justify-center bg-gray-200 text-gray-600 rounded text-xs leading-none

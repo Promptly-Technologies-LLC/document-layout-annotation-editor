@@ -137,8 +137,7 @@ export class PdfViewer {
       let badge = el.querySelector('.seq-badge') as HTMLElement | null;
       if (!badge) {
         badge = document.createElement('span');
-        badge.className = 'seq-badge absolute -bottom-7 -left-7 bg-primary-600 text-white text-xs w-6 h-6 flex items-center justify-center rounded-full';
-        badge.style.zIndex = '1000';
+        badge.className = 'seq-badge';
         el.appendChild(badge);
       }
       badge.textContent = String(idx + 1);
@@ -169,7 +168,7 @@ export class PdfViewer {
     const state = this.uiState.get(annotation.id)!;
     
     const box = document.createElement('div');
-    box.className = 'annotation-box absolute border-2 border-blue-500 bg-blue-100 bg-opacity-20 cursor-move';
+    box.className = 'annotation-box';
     box.dataset.annotationId = annotation.id;
     
     // Use the canvas dimensions as a fallback if page dimensions are missing from the annotation data
@@ -187,20 +186,14 @@ export class PdfViewer {
     // Add resize handles
     ['nw', 'ne', 'sw', 'se'].forEach(handle => {
       const handleEl = document.createElement('div');
-      handleEl.className = `resize-handle ${handle} absolute w-2 h-2 bg-blue-500`;
-      handleEl.dataset.handle = handle; // Store handle type
-      
-      if (handle === 'nw') handleEl.style.cssText = 'top: -1px; left: -1px; cursor: nw-resize;';
-      if (handle === 'ne') handleEl.style.cssText = 'top: -1px; right: -1px; cursor: ne-resize;';
-      if (handle === 'sw') handleEl.style.cssText = 'bottom: -1px; left: -1px; cursor: sw-resize;';
-      if (handle === 'se') handleEl.style.cssText = 'bottom: -1px; right: -1px; cursor: se-resize;';
-      
+      handleEl.className = `resize-handle ${handle}`;
+      handleEl.dataset.handle = handle;
       box.appendChild(handleEl);
     });
     
     // Add type selector
     const select = document.createElement('select');
-    select.className = 'annotation-dropdown absolute -top-7 right-0 bg-white border border-gray-300 rounded px-2 py-1 text-xs';
+    select.className = 'annotation-dropdown';
     select.innerHTML = ANNOTATION_TYPES
       .map(t => `<option value="${t}" ${annotation.type === t ? 'selected' : ''}>${t}</option>`)
       .join('');
@@ -209,31 +202,23 @@ export class PdfViewer {
     
     const typeTgl = this.makeToggle(state.typeCollapsed, () => {
       state.typeCollapsed = !state.typeCollapsed;
-      this.renderAnnotations();     // quickest way to refresh UI
+      this.renderAnnotations();
     });
+    typeTgl.className = 'toggle-btn type-toggle';
     
     select.addEventListener('change', (e) => {
       const target = e.target as HTMLSelectElement;
       annotationStore.updateAnnotation(annotation.id, { type: target.value as any });
     });
     
-    // Prevent mousedown from bubbling up to the annotation box handler
     select.addEventListener('mousedown', e => e.stopPropagation());
     
-    // Position typeTgl in upper right corner (inside rect)
-    typeTgl.style.position = 'absolute';
-    typeTgl.style.top = '2px';
-    typeTgl.style.right = '2px';
-    typeTgl.style.zIndex = '1002';
-    
-    select.style.marginLeft = '4px';        // small gap
     box.appendChild(typeTgl);
     box.appendChild(select);
     
     // Add delete button
     const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'delete-btn absolute -top-7 -right-7 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600';
-    deleteBtn.style.zIndex = '1000';
+    deleteBtn.className = 'delete-btn';
     deleteBtn.innerHTML = '×';
     deleteBtn.title = 'Delete annotation';
     
@@ -242,7 +227,6 @@ export class PdfViewer {
       annotationStore.deleteAnnotation(annotation.id);
     });
     
-    // Prevent mousedown from bubbling up to the annotation box handler
     deleteBtn.addEventListener('mousedown', e => e.stopPropagation());
     
     box.appendChild(deleteBtn);
@@ -251,13 +235,7 @@ export class PdfViewer {
     const textArea = document.createElement('textarea');
     textArea.value = annotation.text || '';
     textArea.placeholder = 'Enter annotation text...';
-    textArea.className = 'text-input absolute left-0 right-0 bg-white border border-gray-300 rounded px-2 py-1 text-xs';
-    textArea.style.top = '100%';
-    textArea.style.zIndex = '1000';
-    textArea.style.height = '1.5rem';
-    textArea.style.resize = 'none';
-    textArea.style.overflow = 'hidden';
-    textArea.style.transition = 'height 0.2s ease';
+    textArea.className = 'text-input';
     
     if (state.textCollapsed) textArea.classList.add('collapsed');
     
@@ -265,12 +243,12 @@ export class PdfViewer {
       state.textCollapsed = !state.textCollapsed;
       this.renderAnnotations();
     });
+    textTgl.className = 'toggle-btn text-toggle';
     
     textArea.addEventListener('focus', () => {
       if (state.textCollapsed) {
         state.textCollapsed = false;
         this.renderAnnotations();
-        // focus will be restored automatically on next render
       } else {
         textArea.style.height = 'auto';
         const newHeight = Math.min(textArea.scrollHeight, 150);
@@ -284,7 +262,6 @@ export class PdfViewer {
       textArea.style.height = '1.5rem';
       textArea.style.overflowY = 'hidden';
       textArea.style.zIndex = '1000';
-      // Use setTimeout to avoid conflicts with the current render cycle
       setTimeout(() => {
         annotationStore.flushTextUpdate(annotation.id, textArea.value);
       }, 0);
@@ -295,23 +272,14 @@ export class PdfViewer {
       annotationStore.debounceTextUpdate(annotation.id, target.value);
     });
     
-    // Prevent mousedown from bubbling up to the annotation box handler
     textArea.addEventListener('mousedown', e => e.stopPropagation());
     
-    // Prevent Delete and Backspace from bubbling up to global handlers
     textArea.addEventListener('keydown', e => {
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.stopPropagation();
       }
     });
     
-    // Position textTgl in lower left corner (inside rect)
-    textTgl.style.position = 'absolute';
-    textTgl.style.bottom = '2px';
-    textTgl.style.left = '2px';
-    textTgl.style.zIndex = '1002';
-    
-    textArea.style.marginLeft = '4px';
     box.appendChild(textTgl);
     box.appendChild(textArea);
     
@@ -322,18 +290,14 @@ export class PdfViewer {
         listeners: {
           start: () => {
             annotationStore.selectAnnotation(annotation);
-            // Add visual feedback for dragging
-            box.style.opacity = '0.7';
-            box.style.zIndex = '1000';
-            box.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.3)';
+            box.classList.add('dragging');
             // Create drag preview overlay
             const overlay = document.createElement('div');
-            overlay.className = 'drag-preview absolute border-2 border-dashed border-green-500 bg-green-100 bg-opacity-20 pointer-events-none';
+            overlay.className = 'drag-preview';
             overlay.style.left = box.style.left;
             overlay.style.top = box.style.top;
             overlay.style.width = box.style.width;
             overlay.style.height = box.style.height;
-            overlay.style.zIndex = '999';
             overlay.dataset.annotationId = annotation.id;
             this.overlay.appendChild(overlay);
           },
@@ -352,10 +316,7 @@ export class PdfViewer {
             }
           },
           end: () => {
-            // Reset visual feedback
-            box.style.opacity = '';
-            box.style.zIndex = '';
-            box.style.boxShadow = '';
+            box.classList.remove('dragging');
             
             // Remove drag preview overlay
             const previewOverlay = this.overlay.querySelector(`.drag-preview[data-annotation-id="${annotation.id}"]`);
@@ -381,18 +342,14 @@ export class PdfViewer {
         listeners: {
           start: () => {
             annotationStore.selectAnnotation(annotation);
-            // Add visual feedback for resizing
-            box.style.opacity = '0.7';
-            box.style.zIndex = '1000';
-            box.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.3)';
+            box.classList.add('resizing');
             // Create resize preview overlay
             const overlay = document.createElement('div');
-            overlay.className = 'resize-preview absolute border-2 border-dashed border-blue-500 bg-blue-100 bg-opacity-20 pointer-events-none';
+            overlay.className = 'resize-preview';
             overlay.style.left = box.style.left;
             overlay.style.top = box.style.top;
             overlay.style.width = box.style.width;
             overlay.style.height = box.style.height;
-            overlay.style.zIndex = '999';
             overlay.dataset.annotationId = annotation.id;
             this.overlay.appendChild(overlay);
           },
@@ -418,10 +375,7 @@ export class PdfViewer {
             }
           },
           end: () => {
-            // Reset visual feedback
-            box.style.opacity = '';
-            box.style.zIndex = '';
-            box.style.boxShadow = '';
+            box.classList.remove('resizing');
             
             // Remove preview overlay
             const previewOverlay = this.overlay.querySelector(`.resize-preview[data-annotation-id="${annotation.id}"]`);
