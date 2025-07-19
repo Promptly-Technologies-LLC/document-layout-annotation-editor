@@ -304,6 +304,13 @@ export class PdfViewer {
     // Prevent mousedown from bubbling up to the annotation box handler
     textArea.addEventListener('mousedown', e => e.stopPropagation());
     
+    // Prevent Delete and Backspace from bubbling up to global handlers
+    textArea.addEventListener('keydown', e => {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.stopPropagation();
+      }
+    });
+    
     // Position textTgl in lower left corner (inside rect)
     textTgl.style.position = 'absolute';
     textTgl.style.bottom = '2px';

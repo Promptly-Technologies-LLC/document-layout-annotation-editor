@@ -190,7 +190,7 @@ class App {
 
   private handleKeyboardShortcuts(e: KeyboardEvent): void {
     // Don't handle shortcuts if user is typing in an input field
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) {
+    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement) {
       return;
     }
 
