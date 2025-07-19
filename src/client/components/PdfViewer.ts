@@ -128,7 +128,8 @@ export class PdfViewer {
     const annotations = annotationStore.getStore().annotations;
     const pageAnnotations = annotations.filter(a => a.page_number === this.currentPage);
     
-    console.log('Rendering annotations for page', this.currentPage, pageAnnotations);
+    const stack = new Error().stack?.split('\n').slice(1, 4).map(line => line.trim()).join(' | ') || 'unknown';
+    console.log('Rendering annotations for page', this.currentPage, 'Count:', pageAnnotations.length, 'Caller:', stack);
     
     pageAnnotations.forEach(annotation => {
       const annotationElement = this.createAnnotationElement(annotation);

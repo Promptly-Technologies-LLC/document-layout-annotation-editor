@@ -145,7 +145,7 @@ export class AnnotationStoreManager {
     if (!this.store.isDirty || this.store.isSaving) return;
 
     this.store.isSaving = true;
-    this.notify();
+    // Don't notify for isSaving state changes - they don't affect annotation rendering
 
     try {
       await apiService.saveAnnotations(filename, this.store.annotations);
@@ -156,7 +156,7 @@ export class AnnotationStoreManager {
       throw error;
     } finally {
       this.store.isSaving = false;
-      this.notify();
+      // Don't notify for isSaving state changes - they don't affect annotation rendering
     }
   }
 
@@ -188,6 +188,8 @@ export class AnnotationStoreManager {
   }
 
   private notify(): void {
+    const stack = new Error().stack?.split('\n').slice(1, 4).map(line => line.trim()).join(' | ') || 'unknown';
+    console.log('AnnotationStore notify() called from:', stack);
     this.listeners.forEach(listener => listener(this.getStore()));
   }
 }
