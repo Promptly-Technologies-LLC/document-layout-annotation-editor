@@ -1,10 +1,12 @@
 import { PdfViewer } from './components/PdfViewer.js';
 import { FileManager } from './components/FileManager.js';
+import { SequencePanel } from './components/SequencePanel.js';
 import { annotationStore } from './store/annotationStore.js';
 import { pdfService } from './services/pdfService.js';
 
 class App {
   private pdfViewer: PdfViewer | null = null;
+  private sequencePanel!: SequencePanel;
   private currentJson: string = '';
 
   constructor() {
@@ -20,6 +22,12 @@ class App {
             <div class="flex justify-between items-center py-4">
               <h1 class="text-2xl font-bold text-gray-900">PDF Annotation Editor</h1>
               <div class="flex items-center space-x-4">
+                <button id="seq-btn" class="btn-secondary">
+                  <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                  </svg>
+                  Order
+                </button>
                 <div id="save-status" class="text-sm text-gray-600"></div>
                 <button id="save-btn" class="btn-primary">
                   <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -85,14 +93,17 @@ class App {
     });
 
     this.pdfViewer = new PdfViewer(pdfViewerContainer);
+    this.sequencePanel = new SequencePanel(document.body);
   }
 
   private setupEventListeners(): void {
     const saveBtn = document.getElementById('save-btn')!;
+    const seqBtn = document.getElementById('seq-btn')!;
     const prevBtn = document.getElementById('prev-page')!;
     const nextBtn = document.getElementById('next-page')!;
 
     saveBtn.addEventListener('click', () => this.saveAnnotations());
+    seqBtn.addEventListener('click', () => this.sequencePanel.toggle());
     prevBtn.addEventListener('click', async () => {
       await this.pdfViewer?.prevPage();
       this.updatePageInfo();

@@ -161,6 +161,22 @@ export class AnnotationStoreManager {
     }, 2000);
   }
 
+  reorderAnnotations(newIds: string[]): void {
+    // Map for O(1) lookup
+    const byId = new Map(this.store.annotations.map(a => [a.id, a]));
+    const reordered = newIds
+      .map(id => byId.get(id))
+      .filter(Boolean) as Annotation[];
+
+    // ignore if nothing really changed
+    if (reordered.length === this.store.annotations.length) {
+      this.store.annotations = reordered;
+      this.store.isDirty = true;
+      this.scheduleAutoSave();
+      this.notify();
+    }
+  }
+
   private notify(): void {
     this.listeners.forEach(listener => listener(this.getStore()));
   }

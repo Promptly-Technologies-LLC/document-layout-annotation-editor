@@ -134,6 +134,21 @@ export class PdfViewer {
       this.overlay.appendChild(annotationElement);
     });
 
+    // Add / update sequence badges
+    pageAnnotations.forEach((a, idx) => {
+      const el = this.overlay.querySelector(`[data-annotation-id="${a.id}"]`) as HTMLElement;
+      if (!el) return;
+
+      let badge = el.querySelector('.seq-badge') as HTMLElement | null;
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'seq-badge absolute -bottom-7 -left-7 bg-primary-600 text-white text-xs w-6 h-6 flex items-center justify-center rounded-full';
+        badge.style.zIndex = '1000';
+        el.appendChild(badge);
+      }
+      badge.textContent = String(idx + 1);
+    });
+
     if (this.restoreFocus) {
       const annotationBox = this.overlay.querySelector(
         `.annotation-box[data-annotation-id="${this.restoreFocus.annotationId}"]`
