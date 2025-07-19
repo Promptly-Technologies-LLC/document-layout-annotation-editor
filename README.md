@@ -30,12 +30,83 @@ src/
 └── shared/          # Shared types and utilities
 ```
 
+## JSON Schema
+
+The Huridocs PDF Document Layout Analysis model returns JSON data with the following schema:
+
+```json
+{
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "left": {
+        "type": "number",
+        "description": "The horizontal position of the element's left edge in points from the page's left edge"
+      },
+      "top": {
+        "type": "number",
+        "description": "The vertical position of the element's top edge in points from the page's top edge"
+      },
+      "width": {
+        "type": "number",
+        "description": "The width of the element in points"
+      },
+      "height": {
+        "type": "number",
+        "description": "The height of the element in points"
+      },
+      "page_number": {
+        "type": "integer",
+        "description": "The 1-based page number where this element appears"
+      },
+      "page_width": {
+        "type": "integer",
+        "description": "The total width of the page in points"
+      },
+      "page_height": {
+        "type": "integer",
+        "description": "The total height of the page in points"
+      },
+      "text": {
+        "type": "string",
+        "description": "The textual content extracted from this document element"
+      },
+      "type": {
+        "type": "string",
+        "enum": [
+          "Caption",
+          "Footnote", 
+          "Formula",
+          "List item",
+          "Page footer",
+          "Page header",
+          "Picture",
+          "Section header",
+          "Table",
+          "Text",
+          "Title"
+        ],
+        "description": "The classification type of this element"
+      }
+    },
+    "required": [
+      "left", "top", "width", "height",
+      "page_number", "page_width", "page_height",
+      "text", "type"
+    ]
+  }
+}
+```
+
+The annotation tool mostly preserves this schema, but it adds unique `id` fields to each annotation. You will want to remove the ids before running any fine-tuning workflow.
+
 ## Getting Started
 
 ### Prerequisites
 
 - Node.js 18+ 
-- npm or yarn
+- npm, yarn, or bun
 
 ### Installation
 
@@ -83,23 +154,12 @@ This will start:
 ## Technology Stack
 
 - **Backend**: Express.js with TypeScript
-- **Frontend**: Vanilla TypeScript with Vite
+- **Frontend**: TypeScript with Vite
 - **Styling**: Tailwind CSS
+- **UI Interactivity**: Interact.js
+- **Type Validation**: Zod
 - **PDF Rendering**: PDF.js
 - **Build Tools**: Vite, TypeScript, ESLint, Prettier
-
-## Improvements over v1
-
-- ✅ TypeScript for type safety
-- ✅ Modern build tools (Vite instead of vanilla HTML/JS)
-- ✅ Component-based architecture
-- ✅ State management with reactive store
-- ✅ Better error handling
-- ✅ Responsive design
-- ✅ Auto-save functionality
-- ✅ Modern UI with Tailwind CSS
-- ✅ Proper file structure
-- ✅ Development tooling (hot reload, linting, formatting)
 
 ## Contributing
 
