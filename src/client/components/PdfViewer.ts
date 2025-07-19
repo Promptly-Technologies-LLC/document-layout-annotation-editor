@@ -1,3 +1,4 @@
+import interact from 'interactjs';
 import { pdfService } from '../services/pdfService.js';
 import { annotationStore } from '../store/annotationStore.js';
 import type { Annotation } from '../../shared/types/annotation.js';
@@ -10,15 +11,7 @@ export class PdfViewer {
   private currentPage: number = 1;
   private isCreatingAnnotation: boolean = false;
   private startPoint: { x: number; y: number } | null = null;
-  private selectedBox: HTMLElement | null = null;
-  private isDragging: boolean = false;
-  private isResizing: boolean = false;
-  private dragOffset: { x: number; y: number } = { x: 0, y: 0 };
   private selectionBox: HTMLElement | null = null;
-  private activeAnnotation: Annotation | null = null;
-  private resizeStartBounds: { left: number; top: number; width: number; height: number } | null = null;
-  private oppositeCorner: { x: number; y: number } | null = null;
-  private resizeOverlay: HTMLElement | null = null;
   private restoreFocus: {
     annotationId: string;
     selectionStart: number;
@@ -183,13 +176,13 @@ export class PdfViewer {
     const page_width = annotation.page_width || this.canvas.width;
     const page_height = annotation.page_height || this.canvas.height;
     
-    const scaleX = this.canvas.width / page_width;
-    const scaleY = this.canvas.height / page_height;
+    const initialScaleX = this.canvas.width / page_width;
+    const initialScaleY = this.canvas.height / page_height;
     
-    box.style.left = `${annotation.left * scaleX}px`;
-    box.style.top = `${annotation.top * scaleY}px`;
-    box.style.width = `${annotation.width * scaleX}px`;
-    box.style.height = `${annotation.height * scaleY}px`;
+    box.style.left = `${annotation.left * initialScaleX}px`;
+    box.style.top = `${annotation.top * initialScaleY}px`;
+    box.style.width = `${annotation.width * initialScaleX}px`;
+    box.style.height = `${annotation.height * initialScaleY}px`;
     
     // Add resize handles
     ['nw', 'ne', 'sw', 'se'].forEach(handle => {
@@ -322,8 +315,142 @@ export class PdfViewer {
     box.appendChild(textTgl);
     box.appendChild(textArea);
     
-    // Event listeners
-    box.addEventListener('mousedown', (e) => this.handleAnnotationMouseDown(e, annotation));
+    // Set up interact.js for drag and resize
+
+    interact(box)
+      .draggable({
+        listeners: {
+          start: () => {
+            annotationStore.selectAnnotation(annotation);
+            // Add visual feedback for dragging
+            box.style.opacity = '0.7';
+            box.style.zIndex = '1000';
+            box.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.3)';
+            // Create drag preview overlay
+            const overlay = document.createElement('div');
+            overlay.className = 'drag-preview absolute border-2 border-dashed border-green-500 bg-green-100 bg-opacity-20 pointer-events-none';
+            overlay.style.left = box.style.left;
+            overlay.style.top = box.style.top;
+            overlay.style.width = box.style.width;
+            overlay.style.height = box.style.height;
+            overlay.style.zIndex = '999';
+            overlay.dataset.annotationId = annotation.id;
+            this.overlay.appendChild(overlay);
+          },
+          move: (event) => {
+            const { dx, dy } = event;
+            const currentLeft = parseFloat(box.style.left);
+            const currentTop = parseFloat(box.style.top);
+            box.style.left = `${currentLeft + dx}px`;
+            box.style.top = `${currentTop + dy}px`;
+            
+            // Update drag preview overlay
+            const previewOverlay = this.overlay.querySelector(`.drag-preview[data-annotation-id="${annotation.id}"]`) as HTMLElement;
+            if (previewOverlay) {
+              previewOverlay.style.left = box.style.left;
+              previewOverlay.style.top = box.style.top;
+            }
+          },
+          end: () => {
+            // Reset visual feedback
+            box.style.opacity = '';
+            box.style.zIndex = '';
+            box.style.boxShadow = '';
+            
+            // Remove drag preview overlay
+            const previewOverlay = this.overlay.querySelector(`.drag-preview[data-annotation-id="${annotation.id}"]`);
+            if (previewOverlay) {
+              previewOverlay.remove();
+            }
+            
+            const finalLeft = parseFloat(box.style.left);
+            const finalTop = parseFloat(box.style.top);
+
+            annotationStore.updateAnnotation(annotation.id, {
+              left: finalLeft / initialScaleX,
+              top: finalTop / initialScaleY,
+            });
+          },
+        },
+        modifiers: [
+          interact.modifiers.restrictRect({ restriction: 'parent' }),
+        ],
+      })
+      .resizable({
+        edges: { left: true, right: true, bottom: true, top: true },
+        listeners: {
+          start: () => {
+            annotationStore.selectAnnotation(annotation);
+            // Add visual feedback for resizing
+            box.style.opacity = '0.7';
+            box.style.zIndex = '1000';
+            box.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.3)';
+            // Create resize preview overlay
+            const overlay = document.createElement('div');
+            overlay.className = 'resize-preview absolute border-2 border-dashed border-blue-500 bg-blue-100 bg-opacity-20 pointer-events-none';
+            overlay.style.left = box.style.left;
+            overlay.style.top = box.style.top;
+            overlay.style.width = box.style.width;
+            overlay.style.height = box.style.height;
+            overlay.style.zIndex = '999';
+            overlay.dataset.annotationId = annotation.id;
+            this.overlay.appendChild(overlay);
+          },
+          move: (event) => {
+            const { width, height } = event.rect;
+            const { left, top } = event.deltaRect;
+
+            box.style.width = `${width}px`;
+            box.style.height = `${height}px`;
+            
+            const currentLeft = parseFloat(box.style.left);
+            const currentTop = parseFloat(box.style.top);
+            box.style.left = `${currentLeft + left}px`;
+            box.style.top = `${currentTop + top}px`;
+            
+            // Update preview overlay
+            const previewOverlay = this.overlay.querySelector(`.resize-preview[data-annotation-id="${annotation.id}"]`) as HTMLElement;
+            if (previewOverlay) {
+              previewOverlay.style.left = box.style.left;
+              previewOverlay.style.top = box.style.top;
+              previewOverlay.style.width = box.style.width;
+              previewOverlay.style.height = box.style.height;
+            }
+          },
+          end: () => {
+            // Reset visual feedback
+            box.style.opacity = '';
+            box.style.zIndex = '';
+            box.style.boxShadow = '';
+            
+            // Remove preview overlay
+            const previewOverlay = this.overlay.querySelector(`.resize-preview[data-annotation-id="${annotation.id}"]`);
+            if (previewOverlay) {
+              previewOverlay.remove();
+            }
+            
+            const finalLeft = parseFloat(box.style.left);
+            const finalTop = parseFloat(box.style.top);
+            const finalWidth = parseFloat(box.style.width);
+            const finalHeight = parseFloat(box.style.height);
+
+            annotationStore.updateAnnotation(annotation.id, {
+              left: finalLeft / initialScaleX,
+              top: finalTop / initialScaleY,
+              width: finalWidth / initialScaleX,
+              height: finalHeight / initialScaleY
+            });
+          }
+        },
+        modifiers: [
+          interact.modifiers.restrictEdges({
+            outer: 'parent',
+          }),
+          interact.modifiers.restrictSize({
+            min: { width: 10, height: 10 },
+          }),
+        ],
+      });
     
     return box;
   }
@@ -367,10 +494,6 @@ export class PdfViewer {
       this.selectionBox.style.top = `${top}px`;
       this.selectionBox.style.width = `${width}px`;
       this.selectionBox.style.height = `${height}px`;
-    } else if (this.isDragging && this.selectedBox) {
-      this.updateDraggingAnnotation(event);
-    } else if (this.isResizing && this.selectedBox) {
-      this.updateResizingAnnotation(event);
     }
   }
 
@@ -378,63 +501,8 @@ export class PdfViewer {
     if (this.isCreatingAnnotation && this.startPoint) {
       this.finishCreatingAnnotation(event);
     }
-
-    // Commit the final position to the store and reset the state
-    if (this.isDragging && this.selectedBox && this.activeAnnotation) {
-      const newLeftPx = parseFloat(this.selectedBox.style.left);
-      const newTopPx = parseFloat(this.selectedBox.style.top);
-      
-      const scaleX = this.canvas.width / this.activeAnnotation.page_width;
-      const scaleY = this.canvas.height / this.activeAnnotation.page_height;
-      
-      annotationStore.updateAnnotation(this.activeAnnotation.id, {
-        left: newLeftPx / scaleX,
-        top: newTopPx / scaleY,
-      });
-    }
-
-    // Commit the final size and position to the store for resize operations
-    if (this.isResizing && this.resizeOverlay && this.activeAnnotation) {
-      // Get final coordinates from overlay
-      const finalLeft = parseFloat(this.resizeOverlay.style.left);
-      const finalTop = parseFloat(this.resizeOverlay.style.top);
-      const finalWidth = parseFloat(this.resizeOverlay.style.width);
-      const finalHeight = parseFloat(this.resizeOverlay.style.height);
-
-      // Remove overlay
-      this.overlay.removeChild(this.resizeOverlay);
-      this.resizeOverlay = null;
-
-      // Validate dimensions before update
-      if (isNaN(finalLeft) || isNaN(finalTop) || 
-          isNaN(finalWidth) || isNaN(finalHeight) ||
-          finalWidth <= 0 || finalHeight <= 0) {
-        console.warn('Invalid resize dimensions. Update skipped.');
-      } else {
-        // Update annotation with normalized coordinates
-        const scaleX = this.canvas.width / this.activeAnnotation.page_width;
-        const scaleY = this.canvas.height / this.activeAnnotation.page_height;
-        
-        annotationStore.updateAnnotation(this.activeAnnotation.id, {
-          left: finalLeft / scaleX,
-          top: finalTop / scaleY,
-          width: finalWidth / scaleX,
-          height: finalHeight / scaleY,
-        });
-      }
-    }
     
     this.isCreatingAnnotation = false;
-    this.isDragging = false;
-    this.isResizing = false;
-    this.activeAnnotation = null;
-    this.selectedBox = null;
-    this.resizeStartBounds = null;
-    this.oppositeCorner = null;
-    if (this.resizeOverlay) {
-      this.overlay.removeChild(this.resizeOverlay);
-      this.resizeOverlay = null;
-    }
   }
 
   private finishCreatingAnnotation(event: MouseEvent): void {
@@ -469,135 +537,6 @@ export class PdfViewer {
     }
   }
 
-  private handleAnnotationMouseDown(event: MouseEvent, annotation: Annotation): void {
-    event.stopPropagation();
-    
-    const target = event.target as HTMLElement;
-    
-    if (target.classList.contains('resize-handle')) {
-      // Find the handle direction from the class list
-      const handleClass = Array.from(target.classList).find(cls => 
-        ['nw', 'ne', 'sw', 'se'].includes(cls)
-      );
-      if (handleClass) {
-        this.startResizing(event, annotation, handleClass);
-      }
-    } else {
-      this.startDragging(event, annotation);
-    }
-    
-    annotationStore.selectAnnotation(annotation);
-  }
-
-  private startDragging(event: MouseEvent, annotation: Annotation): void {
-    this.isDragging = true;
-    this.activeAnnotation = annotation;
-    this.selectedBox = event.currentTarget as HTMLElement;
-
-    const rect = this.overlay.getBoundingClientRect();
-    const scaleX = this.canvas.width / annotation.page_width;
-    const scaleY = this.canvas.height / annotation.page_height;
-    
-    this.dragOffset = {
-      x: event.clientX - rect.left - (annotation.left * scaleX),
-      y: event.clientY - rect.top - (annotation.top * scaleY),
-    };
-  }
-
-  private startResizing(event: MouseEvent, annotation: Annotation, handle: string): void {
-    this.isResizing = true;
-    this.activeAnnotation = annotation;
-    // Get the parent annotation box instead of the resize handle
-    this.selectedBox = (event.target as HTMLElement).parentElement as HTMLElement;
-    
-    // Store the initial bounds for resize calculations
-    this.resizeStartBounds = {
-      left: parseFloat(this.selectedBox.style.left),
-      top: parseFloat(this.selectedBox.style.top),
-      width: parseFloat(this.selectedBox.style.width),
-      height: parseFloat(this.selectedBox.style.height),
-    };
-    
-    // Store opposite corner coordinates based on handle
-    const bounds = this.resizeStartBounds;
-    this.oppositeCorner = {
-      x: handle.includes('e') ? bounds.left : bounds.left + bounds.width,
-      y: handle.includes('s') ? bounds.top : bounds.top + bounds.height
-    };
-    
-    // Create resize overlay
-    this.createResizeOverlay();
-  }
-
-  private createResizeOverlay(): void {
-    this.resizeOverlay = document.createElement('div');
-    this.resizeOverlay.className = 'resize-overlay absolute border-2 border-dashed border-blue-500 bg-blue-100 bg-opacity-20 pointer-events-none';
-    
-    // Initialize with current dimensions
-    if (this.resizeStartBounds) {
-      this.resizeOverlay.style.left = `${this.resizeStartBounds.left}px`;
-      this.resizeOverlay.style.top = `${this.resizeStartBounds.top}px`;
-      this.resizeOverlay.style.width = `${this.resizeStartBounds.width}px`;
-      this.resizeOverlay.style.height = `${this.resizeStartBounds.height}px`;
-    }
-    
-    this.overlay.appendChild(this.resizeOverlay);
-  }
-
-  private updateDraggingAnnotation(event: MouseEvent): void {
-    if (!this.isDragging || !this.selectedBox) return;
-
-    const rect = this.overlay.getBoundingClientRect();
-    const x = event.clientX - rect.left - this.dragOffset.x;
-    const y = event.clientY - rect.top - this.dragOffset.y;
-
-    this.selectedBox.style.left = `${Math.max(0, x)}px`;
-    this.selectedBox.style.top = `${Math.max(0, y)}px`;
-  }
-
-  private updateResizingAnnotation(event: MouseEvent): void {
-    if (!this.isResizing || !this.selectedBox || !this.oppositeCorner || !this.resizeOverlay) return;
-
-    const rect = this.overlay.getBoundingClientRect();
-    const mouseX = event.clientX - rect.left;
-    const mouseY = event.clientY - rect.top;
-
-    // Calculate new rectangle coordinates (allow coordinate swapping)
-    const newRect = {
-      left: Math.min(this.oppositeCorner.x, mouseX),
-      top: Math.min(this.oppositeCorner.y, mouseY),
-      right: Math.max(this.oppositeCorner.x, mouseX),
-      bottom: Math.max(this.oppositeCorner.y, mouseY)
-    };
-
-    // Convert to width/height format
-    const width = newRect.right - newRect.left;
-    const height = newRect.bottom - newRect.top;
-
-    // Ensure minimum dimensions
-    const minSize = 10;
-    if (width < minSize || height < minSize) {
-      return; // Don't update if too small
-    }
-
-    // Ensure bounds stay within the overlay
-    const finalLeft = Math.max(0, Math.min(newRect.left, this.overlay.offsetWidth - width));
-    const finalTop = Math.max(0, Math.min(newRect.top, this.overlay.offsetHeight - height));
-    const finalWidth = Math.min(width, this.overlay.offsetWidth - finalLeft);
-    const finalHeight = Math.min(height, this.overlay.offsetHeight - finalTop);
-
-    // Update overlay preview
-    this.resizeOverlay.style.left = `${finalLeft}px`;
-    this.resizeOverlay.style.top = `${finalTop}px`;
-    this.resizeOverlay.style.width = `${finalWidth}px`;
-    this.resizeOverlay.style.height = `${finalHeight}px`;
-
-    // Update selected box (live preview)
-    this.selectedBox.style.left = `${finalLeft}px`;
-    this.selectedBox.style.top = `${finalTop}px`;
-    this.selectedBox.style.width = `${finalWidth}px`;
-    this.selectedBox.style.height = `${finalHeight}px`;
-  }
 
   getCurrentPage(): number {
     return this.currentPage;
