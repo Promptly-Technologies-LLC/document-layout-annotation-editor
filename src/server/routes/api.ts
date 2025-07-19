@@ -1,8 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { FileService } from '../services/fileService.js';
 import { asyncHandler } from '../middleware/errorHandler.js';
-import { validateSaveRequest } from '../middleware/validation.js';
-import { ApiResponse, SaveRequest, FileListResponse } from '../../shared/types/annotation.js';
+import { validate } from '../middleware/validation.js';
+import { SaveRequestSchema } from '../../shared/validation.js';
+import type { SaveRequest, ApiResponse, FileListResponse } from '../../shared/types/annotation.js';
 
 const router = Router();
 const fileService = new FileService();
@@ -19,8 +20,9 @@ router.get('/files', asyncHandler(async (_req: Request, res: Response) => {
   res.json(response);
 }));
 
-// Save annotations
-router.post('/save-json', validateSaveRequest, asyncHandler(async (req: Request, res: Response) => {
+// Save annotations - Now cleaner and more secure
+router.post('/save-json', validate(SaveRequestSchema), asyncHandler(async (req: Request, res: Response) => {
+  // req.body is now guaranteed to match the SaveRequest schema
   const { filename, data } = req.body as SaveRequest;
   
   const filePath = await fileService.saveAnnotations(filename, data);

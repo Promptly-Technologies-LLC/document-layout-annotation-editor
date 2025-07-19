@@ -1,4 +1,5 @@
 import type { Annotation } from '../../shared/types/annotation.js';
+import { AnnotationSchema } from '../../shared/validation.js';
 import { apiService } from '../services/api.js';
 
 export interface AnnotationStore {
@@ -37,11 +38,22 @@ export class AnnotationStoreManager {
   }
 
   setAnnotations(annotations: any[]): void {
-    // Ensure all annotations have valid IDs and conform to the Annotation interface
-    this.store.annotations = annotations.map(annotation => ({
-      ...annotation,
-      id: annotation.id || crypto.randomUUID()
-    })) as Annotation[];
+    // Validate and sanitize annotations before setting them in the store.
+    const validationResult = AnnotationSchema.array().safeParse(annotations);
+    
+    if (!validationResult.success) {
+      console.error("Invalid annotation data received:", validationResult.error.issues);
+      // Decide on an error strategy: show a message, use only valid ones, or clear all.
+      // For now, we'll filter out the bad ones.
+      const validAnnotations = annotations
+        .map(a => AnnotationSchema.safeParse(a))
+        .filter(r => r.success)
+        .map(r => (r as { success: true; data: Annotation }).data);
+      this.store.annotations = validAnnotations;
+    } else {
+      this.store.annotations = validationResult.data;
+    }
+    
     this.store.isDirty = false;
     this.notify();
   }
