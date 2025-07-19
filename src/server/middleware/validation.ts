@@ -1,5 +1,22 @@
 import { Request, Response, NextFunction } from 'express';
 import { AppError } from './errorHandler.js';
+import { ANNOTATION_TYPES, type Annotation } from '../../shared/types/annotation.js';
+
+const isValidAnnotation = (obj: any): obj is Annotation => {
+  return (
+    obj &&
+    typeof obj.id === 'string' &&
+    typeof obj.left === 'number' &&
+    typeof obj.top === 'number' &&
+    typeof obj.width === 'number' &&
+    typeof obj.height === 'number' &&
+    typeof obj.page_number === 'number' &&
+    typeof obj.page_width === 'number' &&
+    typeof obj.page_height === 'number' &&
+    typeof obj.text === 'string' &&
+    ANNOTATION_TYPES.includes(obj.type)
+  );
+};
 
 export const validateSaveRequest = (
   req: Request,
@@ -22,17 +39,7 @@ export const validateSaveRequest = (
 
   // Validate each annotation
   for (const annotation of data) {
-    if (
-      typeof annotation.left !== 'number' ||
-      typeof annotation.top !== 'number' ||
-      typeof annotation.width !== 'number' ||
-      typeof annotation.height !== 'number' ||
-      typeof annotation.page_number !== 'number' ||
-      typeof annotation.page_width !== 'number' ||
-      typeof annotation.page_height !== 'number' ||
-      typeof annotation.text !== 'string' ||
-      typeof annotation.type !== 'string'
-    ) {
+    if (!isValidAnnotation(annotation)) {
       throw new AppError(400, 'Invalid annotation format');
     }
   }

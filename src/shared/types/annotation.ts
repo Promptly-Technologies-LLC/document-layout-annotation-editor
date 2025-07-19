@@ -1,15 +1,18 @@
-export type AnnotationType = 
-  | 'Title'
-  | 'Section header'
-  | 'Text'
-  | 'Picture'
-  | 'Table'
-  | 'List item'
-  | 'Formula'
-  | 'Footnote'
-  | 'Page header'
-  | 'Page footer'
-  | 'Caption';
+export const ANNOTATION_TYPES = [
+  'Title',
+  'Section header',
+  'Text',
+  'Picture',
+  'Table',
+  'List item',
+  'Formula',
+  'Footnote',
+  'Page header',
+  'Page footer',
+  'Caption',
+] as const;
+
+export type AnnotationType = typeof ANNOTATION_TYPES[number];
 
 export interface Annotation {
   id: string;

@@ -1,6 +1,7 @@
 import { pdfService } from '../services/pdfService.js';
 import { annotationStore } from '../store/annotationStore.js';
 import type { Annotation } from '../../shared/types/annotation.js';
+import { ANNOTATION_TYPES } from '../../shared/types/annotation.js';
 
 export class PdfViewer {
   private container: HTMLElement;
@@ -206,19 +207,9 @@ export class PdfViewer {
     // Add type selector
     const select = document.createElement('select');
     select.className = 'annotation-dropdown absolute -top-7 right-0 bg-white border border-gray-300 rounded px-2 py-1 text-xs';
-    select.innerHTML = `
-      <option value="Text" ${annotation.type === 'Text' ? 'selected' : ''}>Text</option>
-      <option value="Title" ${annotation.type === 'Title' ? 'selected' : ''}>Title</option>
-      <option value="Section header" ${annotation.type === 'Section header' ? 'selected' : ''}>Section header</option>
-      <option value="Picture" ${annotation.type === 'Picture' ? 'selected' : ''}>Picture</option>
-      <option value="Table" ${annotation.type === 'Table' ? 'selected' : ''}>Table</option>
-      <option value="List item" ${annotation.type === 'List item' ? 'selected' : ''}>List item</option>
-      <option value="Formula" ${annotation.type === 'Formula' ? 'selected' : ''}>Formula</option>
-      <option value="Footnote" ${annotation.type === 'Footnote' ? 'selected' : ''}>Footnote</option>
-      <option value="Page header" ${annotation.type === 'Page header' ? 'selected' : ''}>Page header</option>
-      <option value="Page footer" ${annotation.type === 'Page footer' ? 'selected' : ''}>Page footer</option>
-      <option value="Caption" ${annotation.type === 'Caption' ? 'selected' : ''}>Caption</option>
-    `;
+    select.innerHTML = ANNOTATION_TYPES
+      .map(t => `<option value="${t}" ${annotation.type === t ? 'selected' : ''}>${t}</option>`)
+      .join('');
     
     if (state.typeCollapsed) select.classList.add('collapsed');
     
