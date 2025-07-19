@@ -235,6 +235,12 @@ export class PdfViewer {
     // Prevent mousedown from bubbling up to the annotation box handler
     select.addEventListener('mousedown', e => e.stopPropagation());
     
+    // Position typeTgl in upper right corner (inside rect)
+    typeTgl.style.position = 'absolute';
+    typeTgl.style.top = '2px';
+    typeTgl.style.right = '2px';
+    typeTgl.style.zIndex = '1002';
+    
     select.style.marginLeft = '4px';        // small gap
     box.appendChild(typeTgl);
     box.appendChild(select);
@@ -306,6 +312,12 @@ export class PdfViewer {
     
     // Prevent mousedown from bubbling up to the annotation box handler
     textArea.addEventListener('mousedown', e => e.stopPropagation());
+    
+    // Position textTgl in lower left corner (inside rect)
+    textTgl.style.position = 'absolute';
+    textTgl.style.bottom = '2px';
+    textTgl.style.left = '2px';
+    textTgl.style.zIndex = '1002';
     
     textArea.style.marginLeft = '4px';
     box.appendChild(textTgl);
