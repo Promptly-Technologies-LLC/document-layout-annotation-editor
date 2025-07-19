@@ -20,9 +20,8 @@ router.get('/files', asyncHandler(async (_req: Request, res: Response) => {
   res.json(response);
 }));
 
-// Save annotations - Now cleaner and more secure
+// Save annotations
 router.post('/save-json', validate(SaveRequestSchema), asyncHandler(async (req: Request, res: Response) => {
-  // req.body is now guaranteed to match the SaveRequest schema
   const { filename, data } = req.body as SaveRequest;
   
   const filePath = await fileService.saveAnnotations(filename, data);

@@ -43,8 +43,6 @@ export class AnnotationStoreManager {
     
     if (!validationResult.success) {
       console.error("Invalid annotation data received:", validationResult.error.issues);
-      // Decide on an error strategy: show a message, use only valid ones, or clear all.
-      // For now, we'll filter out the bad ones.
       const validAnnotations = annotations
         .map(a => AnnotationSchema.safeParse(a))
         .filter(r => r.success)
