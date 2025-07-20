@@ -62,7 +62,16 @@ export class AnnotationStoreManager {
       id: crypto.randomUUID(),
     };
     
-    this.store.annotations.push(newAnnotation);
+    // Find the index to insert after the last annotation on the same page
+    let insertIndex = this.store.annotations.length;
+    for (let i = this.store.annotations.length - 1; i >= 0; i--) {
+      if (this.store.annotations[i].page_number === newAnnotation.page_number) {
+        insertIndex = i + 1;
+        break;
+      }
+    }
+    
+    this.store.annotations.splice(insertIndex, 0, newAnnotation);
     this.store.isDirty = true;
     this.scheduleAutoSave();
     this.notify();
