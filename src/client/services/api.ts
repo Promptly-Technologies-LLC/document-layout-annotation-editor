@@ -1,4 +1,4 @@
-import type { Annotation, ApiResponse, FileListResponse, SaveRequest } from '../../shared/types/annotation.js';
+import type { Annotation, ApiResponse, FileListResponse, SaveRequest, SyncRequest } from '../../shared/types/annotation.js';
 
 const API_BASE = '/api';
 
@@ -45,6 +45,18 @@ class ApiService {
       throw new Error(response.error || 'Failed to load annotations');
     }
     return response.data;
+  }
+
+  async syncFile(filename: string): Promise<void> {
+    const request: SyncRequest = { filename };
+    const response = await this.fetchJson<ApiResponse<{ s3Key: string }>>(`${API_BASE}/sync`, {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to sync file to S3');
+    }
   }
 
   async getFileInfo(filename: string, type: 'pdf' | 'json') {

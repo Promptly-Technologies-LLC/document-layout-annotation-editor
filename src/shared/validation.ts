@@ -26,6 +26,13 @@ export const SaveRequestSchema = z.object({
   data: z.array(AnnotationSchema),
 });
 
+// Schema for the `/api/sync` endpoint body.
+export const SyncRequestSchema = z.object({
+  filename: z.string().refine(val => val.endsWith('.json'), {
+    message: "Filename must have .json extension",
+  }),
+});
+
 // Schema for the `/api/files` response.
 export const FileListResponseSchema = z.object({
   pdfFiles: z.array(z.string()),
@@ -35,6 +42,7 @@ export const FileListResponseSchema = z.object({
 // Now, we infer our TypeScript types directly from the schemas.
 export type Annotation = z.infer<typeof AnnotationSchema>;
 export type SaveRequest = z.infer<typeof SaveRequestSchema>;
+export type SyncRequest = z.infer<typeof SyncRequestSchema>;
 export type FileListResponse = z.infer<typeof FileListResponseSchema>;
 
 // Keep other shared types that don't have a direct schema equivalent

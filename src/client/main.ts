@@ -3,11 +3,13 @@ import { FileManager } from './components/FileManager.js';
 import { SequencePanel } from './components/SequencePanel.js';
 import { annotationStore } from './store/annotationStore.js';
 import { pdfService } from './services/pdfService.js';
+import { apiService } from './services/api.js';
 
 class App {
   private pdfViewer: PdfViewer | null = null;
   private sequencePanel!: SequencePanel;
   private currentJson: string = '';
+  private isSyncing: boolean = false;
 
   constructor() {
     this.init();
@@ -28,12 +30,12 @@ class App {
                   </svg>
                   Order
                 </button>
-                <div id="save-status" class="text-sm text-gray-600"></div>
-                <button id="save-btn" class="btn-primary">
+                <div id="status-text" class="text-sm text-gray-600"></div>
+                <button id="sync-btn" class="btn-primary">
                   <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path>
+                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M12 12v9m-4-4l4-4 4 4"></path>
                   </svg>
-                  Save
+                  Sync
                 </button>
               </div>
             </div>
@@ -97,12 +99,12 @@ class App {
   }
 
   private setupEventListeners(): void {
-    const saveBtn = document.getElementById('save-btn')!;
+    const syncBtn = document.getElementById('sync-btn')!;
     const seqBtn = document.getElementById('seq-btn')!;
     const prevBtn = document.getElementById('prev-page')!;
     const nextBtn = document.getElementById('next-page')!;
 
-    saveBtn.addEventListener('click', () => this.saveAnnotations());
+    syncBtn.addEventListener('click', () => this.syncAnnotations());
     seqBtn.addEventListener('click', () => this.sequencePanel.toggle());
     prevBtn.addEventListener('click', async () => {
       await this.pdfViewer?.prevPage();
@@ -113,10 +115,11 @@ class App {
       this.updatePageInfo();
     });
     
-    // Auto-save event listener
+    // Auto-save event listener (This remains important for local saving)
     window.addEventListener('autoSaveRequested', () => {
       if (this.currentJson && annotationStore.getStore().isDirty) {
-        this.saveAnnotations();
+        // Just save locally, don't sync
+        annotationStore.saveAnnotations(this.currentJson);
       }
     });
 
@@ -125,20 +128,26 @@ class App {
   }
 
   private setupStoreSubscription(): void {
-    annotationStore.subscribe((store) => {
-      const saveBtn = document.getElementById('save-btn')!;
-      const saveStatus = document.getElementById('save-status')!;
-      
-      (saveBtn as HTMLButtonElement).disabled = !store.isDirty || store.isSaving;
-      
-      if (store.isSaving) {
-        saveStatus.textContent = 'Saving...';
-      } else if (store.lastSaved) {
-        saveStatus.textContent = `Last saved: ${store.lastSaved.toLocaleTimeString()}`;
-      } else {
-        saveStatus.textContent = '';
-      }
-    });
+    annotationStore.subscribe(() => this.updateStatus());
+  }
+
+  private updateStatus(): void {
+    const store = annotationStore.getStore();
+    const syncBtn = document.getElementById('sync-btn')! as HTMLButtonElement;
+    const statusText = document.getElementById('status-text')!;
+    
+    // The Sync button should be enabled if there are changes to save, and we are not busy.
+    syncBtn.disabled = !store.isDirty || store.isSaving || this.isSyncing;
+    
+    if (this.isSyncing) {
+      statusText.textContent = 'Syncing to S3...';
+    } else if (store.isSaving) {
+      statusText.textContent = 'Saving...';
+    } else if (store.lastSaved) {
+      statusText.textContent = `Saved: ${store.lastSaved.toLocaleTimeString()}`;
+    } else {
+      statusText.textContent = '';
+    }
   }
 
   private async handlePdfSelected(filename: string): Promise<void> {
@@ -161,17 +170,46 @@ class App {
     }
   }
 
+  // This method is now only for local saving (autosave, shortcuts)
   private async saveAnnotations(): Promise<void> {
-    if (!this.currentJson) {
-      alert('Please select a JSON file first');
+    if (!this.currentJson || !annotationStore.getStore().isDirty) {
       return;
     }
-
     try {
       await annotationStore.saveAnnotations(this.currentJson);
     } catch (error) {
       console.error('Failed to save annotations:', error);
-      alert('Failed to save annotations');
+      alert('Failed to save annotations locally.');
+    }
+  }
+  
+  // New method to handle the full sync process
+  private async syncAnnotations(): Promise<void> {
+    if (!this.currentJson || this.isSyncing || annotationStore.getStore().isSaving) {
+      return;
+    }
+
+    this.isSyncing = true;
+    this.updateStatus();
+
+    try {
+      // 1. First, ensure latest changes are saved locally.
+      await this.saveAnnotations();
+      
+      // 2. Then, call the API to sync the local file to S3.
+      await apiService.syncFile(this.currentJson);
+
+      // Update status on success
+      const statusText = document.getElementById('status-text')!;
+      statusText.textContent = `Synced: ${new Date().toLocaleTimeString()}`;
+
+    } catch (error) {
+      console.error('Failed to sync annotations:', error);
+      alert(`Failed to sync annotations: ${error}`);
+      this.updateStatus(); // a full status refresh
+    } finally {
+      this.isSyncing = false;
+      this.updateStatus(); // a full status refresh
     }
   }
 
@@ -199,7 +237,7 @@ class App {
       switch (e.key) {
         case 's':
           e.preventDefault();
-          this.saveAnnotations();
+          this.saveAnnotations(); // Ctrl+S should perform a quick local save
           break;
       }
     } else {
