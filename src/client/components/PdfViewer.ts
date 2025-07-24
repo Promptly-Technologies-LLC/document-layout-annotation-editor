@@ -122,12 +122,35 @@ export class PdfViewer {
     const pageAnnotations = annotations.filter(a => a.page_number === this.currentPage);
     
     const stack = new Error().stack?.split('\n').slice(1, 4).map(line => line.trim()).join(' | ') || 'unknown';
-    console.log('Rendering annotations for page', this.currentPage, 'Count:', pageAnnotations.length, 'Caller:', stack);
+    console.group(`🎨 Rendering annotations for page ${this.currentPage}`);
+    console.log(`Total annotations in store: ${annotations.length}`);
+    console.log(`Annotations for current page ${this.currentPage}: ${pageAnnotations.length}`);
+    console.log(`Called from: ${stack}`);
     
-    pageAnnotations.forEach(annotation => {
-      const annotationElement = this.createAnnotationElement(annotation);
-      this.overlay.appendChild(annotationElement);
+    if (annotations.length > 0) {
+      // Show page distribution
+      const pageDistribution: Record<number, number> = {};
+      annotations.forEach(a => {
+        pageDistribution[a.page_number] = (pageDistribution[a.page_number] || 0) + 1;
+      });
+      console.log(`Page distribution:`, pageDistribution);
+      
+      if (pageAnnotations.length === 0) {
+        console.warn(`⚠️ No annotations found for page ${this.currentPage}. Available pages:`, Object.keys(pageDistribution).map(Number).sort((a, b) => a - b));
+      }
+    }
+    
+    pageAnnotations.forEach((annotation, index) => {
+      try {
+        const annotationElement = this.createAnnotationElement(annotation);
+        this.overlay.appendChild(annotationElement);
+        console.log(`✅ Rendered annotation ${index + 1}/${pageAnnotations.length}: ${annotation.type} at (${annotation.left}, ${annotation.top})`);
+      } catch (error) {
+        console.error(`❌ Failed to render annotation ${index + 1}:`, annotation, error);
+      }
     });
+    
+    console.groupEnd();
 
     // Add / update sequence badges
     pageAnnotations.forEach((a, idx) => {

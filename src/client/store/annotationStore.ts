@@ -1,5 +1,5 @@
 import type { Annotation } from '../../shared/types/annotation.js';
-import { AnnotationSchema } from '../../shared/validation.js';
+import { FlexibleAnnotationSchema } from '../../shared/validation.js';
 import { apiService } from '../services/api.js';
 
 export interface AnnotationStore {
@@ -39,17 +39,73 @@ export class AnnotationStoreManager {
 
   setAnnotations(annotations: any[]): void {
     // Validate and sanitize annotations before setting them in the store.
-    const validationResult = AnnotationSchema.array().safeParse(annotations);
+    const validationResult = FlexibleAnnotationSchema.array().safeParse(annotations);
     
     if (!validationResult.success) {
-      console.error("Invalid annotation data received:", validationResult.error.issues);
-      const validAnnotations = annotations
-        .map(a => AnnotationSchema.safeParse(a))
-        .filter(r => r.success)
-        .map(r => (r as { success: true; data: Annotation }).data);
+      console.group("🚨 Invalid annotation data received:");
+      console.log(`Total annotations: ${annotations.length}`);
+      console.log(`Validation errors:`, validationResult.error.issues);
+      
+      // Log the first few invalid annotations for debugging
+      const sampleInvalid = annotations.slice(0, 3);
+      console.log("Sample of first 3 annotations:", sampleInvalid);
+      
+      // Individual validation to identify problematic annotations and add IDs
+      const validAnnotations: Annotation[] = [];
+      const invalidAnnotations: any[] = [];
+      
+      annotations.forEach((annotation, index) => {
+        const flexibleResult = FlexibleAnnotationSchema.safeParse(annotation);
+        if (flexibleResult.success) {
+          // Add ID if missing
+          const data = flexibleResult.data;
+          const annotationWithId: Annotation = 'id' in data && data.id
+            ? data as Annotation
+            : { ...data, id: crypto.randomUUID() };
+          validAnnotations.push(annotationWithId);
+        } else {
+          invalidAnnotations.push({
+            index,
+            annotation,
+            errors: flexibleResult.error.issues.map(issue => ({
+              path: issue.path.join('.'),
+              message: issue.message,
+              code: issue.code
+            }))
+          });
+        }
+      });
+      
+      console.log(`✅ Valid annotations: ${validAnnotations.length}`);
+      console.log(`❌ Invalid annotations: ${invalidAnnotations.length}`);
+      
+      if (invalidAnnotations.length > 0) {
+        console.log("First 5 invalid annotations:", invalidAnnotations.slice(0, 5));
+        
+        // Summary of common errors
+        const errorCounts: Record<string, number> = {};
+        invalidAnnotations.forEach(item => {
+          item.errors.forEach((error: any) => {
+            const key = `${error.path}: ${error.message}`;
+            errorCounts[key] = (errorCounts[key] || 0) + 1;
+          });
+        });
+        
+        console.log("Common validation errors:", errorCounts);
+      }
+      
+      console.groupEnd();
+      
       this.store.annotations = validAnnotations;
     } else {
-      this.store.annotations = validationResult.data;
+      console.log(`✅ All ${annotations.length} annotations are valid`);
+      // Ensure all annotations have IDs even in the success case
+      const annotationsWithIds: Annotation[] = validationResult.data.map(annotation => {
+        return 'id' in annotation && annotation.id 
+          ? annotation as Annotation
+          : { ...annotation, id: crypto.randomUUID() };
+      });
+      this.store.annotations = annotationsWithIds;
     }
     
     this.store.isDirty = false;

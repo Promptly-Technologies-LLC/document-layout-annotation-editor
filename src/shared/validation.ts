@@ -1,9 +1,8 @@
 // src/shared/validation.ts
 import { z } from 'zod';
 
-// Base schema for a single annotation. This replaces the manual `isValidAnnotation` check.
-export const AnnotationSchema = z.object({
-  id: z.string().uuid().or(z.string().min(1)), // Allow UUID or any non-empty string for legacy/new
+// Base annotation data without id (for raw data loading)
+export const RawAnnotationSchema = z.object({
   left: z.number(),
   top: z.number(),
   width: z.number().gte(0),
@@ -17,6 +16,17 @@ export const AnnotationSchema = z.object({
     'List item', 'Formula', 'Footnote', 'Page header', 'Page footer', 'Caption',
   ]),
 });
+
+// Full annotation schema with required id (for internal use)
+export const AnnotationSchema = RawAnnotationSchema.extend({
+  id: z.string().uuid().or(z.string().min(1)), // Allow UUID or any non-empty string for legacy/new
+});
+
+// Flexible schema that accepts both raw annotations and annotations with id
+export const FlexibleAnnotationSchema = z.union([
+  AnnotationSchema,
+  RawAnnotationSchema
+]);
 
 // Schema for the `/api/save-json` endpoint body.
 export const SaveRequestSchema = z.object({
