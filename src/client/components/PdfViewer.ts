@@ -310,6 +310,7 @@ export class PdfViewer {
 
     interact(box)
       .draggable({
+        ignoreFrom: 'input, textarea, select, .toggle-btn, .delete-btn',
         listeners: {
           start: () => {
             annotationStore.selectAnnotation(annotation);
@@ -361,6 +362,7 @@ export class PdfViewer {
         ],
       })
       .resizable({
+        ignoreFrom: 'input, textarea, select, .toggle-btn, .delete-btn',
         edges: { left: true, right: true, bottom: true, top: true },
         listeners: {
           start: () => {
