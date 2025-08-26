@@ -19,6 +19,119 @@ Intended for use in creating datasets for fine-tuning the [Huridocs PDF Document
 
 The application follows a modern, modular architecture:
 
+```mermaid
+flowchart LR
+  %% High-level architecture with filesystem mapping and key interactions
+
+  %% ========= Client =========
+  subgraph Client["Client (src/client)"]
+    direction TB
+    C_index[index.html]
+    C_main[main.ts<br/>Bootstraps App, binds UI + store]
+    C_components[components/*]
+    C_FileMgr[components/FileManager.ts<br/>PDF/JSON selectors]
+    C_PdfViewer[components/PdfViewer.ts<br/>Renders PDF + annotations]
+    C_SeqPanel[components/SequencePanel.ts<br/>Reading order sidebar]
+    C_services[services/*]
+    C_api[services/api.ts<br/>Fetch wrapper for /api]
+    C_pdfSvc[services/pdfService.ts<br/>PDF.js wrapper + rendering]
+    C_store[store/annotationStore.ts<br/>Central state + autosave debounce]
+    C_styles[styles/main.css<br/>Tailwind components/utilities]
+  end
+
+  %% ========= Server =========
+  subgraph Server["Server (src/server)"]
+    direction TB
+    S_index[index.ts<br/>Express app: helmet/cors/compression<br/>Mounts routes + static<br/>Serves dist client in prod]
+    subgraph S_routes["routes/*"]
+      S_api[routes/api.ts<br/>REST API:<br/>- GET /api/files<br/>- POST /api/save-json<br/>- POST /api/sync<br/>- GET /api/annotations/:filename<br/>- GET /api/file-info/:type/:filename]
+      S_static[routes/static.ts<br/>Static:<br/>- GET /pdfs/:filename<br/>- GET /output/:filename<br/>- /static/*]
+    end
+    subgraph S_mw["middleware/*"]
+      S_err[middleware/errorHandler.ts<br/>AppError + asyncHandler]
+      S_val[middleware/validation.ts<br/>validate schema via zod]
+    end
+    subgraph S_services["services/*"]
+      S_file[services/fileService.ts<br/>Read/Write pdfs & output<br/>List files, file info]
+      S_s3[services/s3Service.ts<br/>S3Client, findFileKey, uploadFile]
+    end
+  end
+
+  %% ========= Shared =========
+  subgraph Shared["Shared (src/shared)"]
+    direction TB
+    Sh_validation[validation.ts<br/>Zod schemas:<br/>Annotation, RawAnnotation,<br/>SaveRequest, SyncRequest,<br/>FileListResponse]
+    Sh_types[types/annotation.ts<br/>Re-exports + ANNOTATION_TYPES]
+  end
+
+  %% ========= Build & Tooling =========
+  subgraph Build["Build & Tooling (root)"]
+    direction TB
+    B_vite[vite.config.ts<br/>Dev server + proxy:<br/>/api, /pdfs, /output -> :3001]
+    B_ts[tsconfig.json]
+    B_tailwind[tailwind.config.js]
+    B_postcss[postcss.config.js]
+    B_pkg[package.json<br/>Scripts + deps]
+  end
+
+  %% ========= External/FS =========
+  Ext_pdfjs[pdfjs-dist npm<br/>PDF.js + worker]
+  FS_pdfs[(pdfs/ directory)]
+  FS_output[(output/ directory)]
+  AWS_S3[(AWS S3 Bucket)]
+
+  %% ========= Client Flow =========
+  User([User in Browser]) --> C_index --> C_main
+  C_main --> C_FileMgr
+  C_main --> C_PdfViewer
+  C_main --> C_SeqPanel
+  C_main --> C_styles
+
+  %% Store as central hub
+  C_FileMgr <--> C_api
+  C_PdfViewer <--> C_store
+  C_SeqPanel <--> C_store
+  C_store -.autosave debounce.-> C_api
+
+  %% PDF rendering
+  C_PdfViewer --> C_pdfSvc --> Ext_pdfjs
+
+  %% ========= Network/API Flow =========
+  %% Vite dev proxy forwards client requests to Express during development
+  C_api -->|HTTP JSON<br/>/api/*| S_api
+  C_PdfViewer -->|GET /pdfs/:filename| S_static
+  C_index -.in prod: served by Express dist/client.-> S_index
+  B_vite -.dev proxy /api,/pdfs,/output.-> S_index
+
+  %% ========= Server internals =========
+  S_index --> S_routes
+  S_index --> S_err
+  S_index --> S_file
+
+  %% API route dependencies
+  S_api --> S_val
+  S_api --> Sh_validation
+  S_api --> Sh_types
+  S_api --> S_file
+  S_api --> S_s3
+  S_api --> S_err
+
+  %% Static route dependencies
+  S_static --> S_file
+
+  %% File system + Cloud
+  S_file --> FS_pdfs
+  S_file --> FS_output
+  S_s3 --> AWS_S3
+
+  %% ========= Shared usage on client =========
+  C_api --> Sh_types
+  C_store --> Sh_validation
+  C_store --> Sh_types
+```
+
+## File Structure
+
 ```
 src/
 ├── server/          # Express server with TypeScript
@@ -106,14 +219,14 @@ The annotation tool mostly preserves this schema, but it adds unique `id` fields
 ### Prerequisites
 
 - Node.js 18+ 
-- npm, yarn, or bun
+- bun
 
 ### Installation
 
 1. Clone the repository
 2. Install dependencies:
    ```bash
-   npm install
+   bun install
    ```
 
 3. Create the required directories:
@@ -123,7 +236,7 @@ The annotation tool mostly preserves this schema, but it adds unique `id` fields
 
 4. Start the development server:
    ```bash
-   npm run dev
+   bun run dev
    ```
 
 This will start:
@@ -139,10 +252,10 @@ This will start:
 
 ### Development
 
-- **Server**: `npm run dev:server` - Runs the Express server with hot reload
-- **Client**: `npm run dev:client` - Runs Vite dev server
-- **Build**: `npm run build` - Builds for production
-- **Preview**: `npm run preview` - Preview production build
+- **Type Check**: `bun run type-check` - Type check the project
+- **Dogfooding**: `bun run dev` - Runs Vite dev server and TS watch with hot reload
+- **Build**: `bun run build` - Builds for production
+- **Preview**: `bun run preview` - Preview production build
 
 ### API Endpoints
 
