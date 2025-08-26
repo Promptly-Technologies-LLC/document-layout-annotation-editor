@@ -95,7 +95,7 @@ class App {
     });
 
     this.pdfViewer = new PdfViewer(pdfViewerContainer);
-    this.sequencePanel = new SequencePanel(document.body);
+    this.sequencePanel = new SequencePanel(document.body, this.pdfViewer);
   }
 
   private setupEventListeners(): void {
@@ -109,10 +109,12 @@ class App {
     prevBtn.addEventListener('click', async () => {
       await this.pdfViewer?.prevPage();
       this.updatePageInfo();
+      this.sequencePanel.render();
     });
     nextBtn.addEventListener('click', async () => {
       await this.pdfViewer?.nextPage();
       this.updatePageInfo();
+      this.sequencePanel.render();
     });
     
     // Auto-save event listener (This remains important for local saving)
@@ -156,6 +158,7 @@ class App {
       await this.pdfViewer?.loadPdf(`/pdfs/${filename}`);
       console.log('PDF loaded successfully');
       this.updatePageInfo();
+      this.sequencePanel.render();
     } catch (error) {
       console.error('Failed to load PDF:', error);
     }
@@ -244,11 +247,11 @@ class App {
       switch (e.key) {
         case 'ArrowLeft':
           e.preventDefault();
-          this.pdfViewer?.prevPage().then(() => this.updatePageInfo());
+          this.pdfViewer?.prevPage().then(() => { this.updatePageInfo(); this.sequencePanel.render(); });
           break;
         case 'ArrowRight':
           e.preventDefault();
-          this.pdfViewer?.nextPage().then(() => this.updatePageInfo());
+          this.pdfViewer?.nextPage().then(() => { this.updatePageInfo(); this.sequencePanel.render(); });
           break;
         case 'Delete':
         case 'Backspace':

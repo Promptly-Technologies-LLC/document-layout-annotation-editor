@@ -95,7 +95,7 @@ export class AnnotationStoreManager {
       }
       
       console.groupEnd();
-      
+
       this.store.annotations = validAnnotations;
     } else {
       console.log(`✅ All ${annotations.length} annotations are valid`);
@@ -118,12 +118,30 @@ export class AnnotationStoreManager {
       id: crypto.randomUUID(),
     };
     
-    // Find the index to insert after the last annotation on the same page
+    // Determine insertion index:
+    // 1) After the last annotation on the same page, if any
+    // 2) Otherwise, after the last annotation of any earlier page
+    // 3) Otherwise, at the start (no earlier pages)
     let insertIndex = this.store.annotations.length;
+    let foundSamePage = false;
     for (let i = this.store.annotations.length - 1; i >= 0; i--) {
-      if (this.store.annotations[i].page_number === newAnnotation.page_number) {
+      const a = this.store.annotations[i];
+      if (a.page_number === newAnnotation.page_number) {
         insertIndex = i + 1;
+        foundSamePage = true;
         break;
+      }
+    }
+    if (!foundSamePage) {
+      insertIndex = 0; // default to start; will move past any earlier pages below
+      for (let i = 0; i < this.store.annotations.length; i++) {
+        const a = this.store.annotations[i];
+        if (a.page_number <= newAnnotation.page_number) {
+          insertIndex = i + 1;
+        } else {
+          // first later page encountered, stop
+          break;
+        }
       }
     }
     
@@ -237,19 +255,39 @@ export class AnnotationStoreManager {
   }
 
   reorderAnnotations(newIds: string[]): void {
-    // Map for O(1) lookup
-    const byId = new Map(this.store.annotations.map(a => [a.id, a]));
-    const reordered = newIds
-      .map(id => byId.get(id))
-      .filter(Boolean) as Annotation[];
+    if (newIds.length === 0) return;
 
-    // ignore if nothing really changed
-    if (reordered.length === this.store.annotations.length) {
-      this.store.annotations = reordered;
-      this.store.isDirty = true;
-      this.scheduleAutoSave();
-      this.notify();
-    }
+    const byId = new Map(this.store.annotations.map(a => [a.id, a]));
+    // Validate all IDs exist
+    const missing = newIds.filter(id => !byId.has(id));
+    if (missing.length > 0) return;
+
+    // Determine the page for these IDs (assume all on same page, as provided by SequencePanel)
+    const pageNumber = byId.get(newIds[0])!.page_number;
+    const pageIds = this.store.annotations
+      .filter(a => a.page_number === pageNumber)
+      .map(a => a.id);
+
+    // Ensure newIds is a permutation of current page's IDs
+    const sameCardinality = pageIds.length === newIds.length;
+    const sameMembers = sameCardinality && new Set(pageIds).size === new Set(newIds).size && pageIds.every(id => newIds.includes(id));
+    if (!sameMembers) return;
+
+    // Replace annotations for this page in-place maintaining positions, only changing order among them
+    let nextIndex = 0;
+    const nextByOrder = newIds.map(id => byId.get(id)!) as Annotation[];
+
+    this.store.annotations = this.store.annotations.map(a => {
+      if (a.page_number === pageNumber) {
+        const replacement = nextByOrder[nextIndex++];
+        return replacement;
+      }
+      return a;
+    });
+
+    this.store.isDirty = true;
+    this.scheduleAutoSave();
+    this.notify();
   }
 
   private notify(): void {

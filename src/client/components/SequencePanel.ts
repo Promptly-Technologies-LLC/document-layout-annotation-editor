@@ -1,10 +1,12 @@
 import { annotationStore } from '../store/annotationStore.js';
+import type { PdfViewer } from './PdfViewer.js';
 
 export class SequencePanel {
   private panel: HTMLElement;
   private list: HTMLElement;
+  private pdfViewer: PdfViewer | null = null;
 
-  constructor(parent: HTMLElement) {
+  constructor(parent: HTMLElement, pdfViewer?: PdfViewer) {
     this.panel = document.createElement('div');
     this.panel.className = 'fixed top-0 right-0 h-full w-72 max-w-full bg-white shadow-2xl transform translate-x-full transition-transform duration-300 z-50';
     this.panel.innerHTML = `
@@ -15,6 +17,8 @@ export class SequencePanel {
       <ul id="seq-list" class="p-4 space-y-2 overflow-y-auto h-[calc(100%-56px)]"></ul>
     `;
     parent.appendChild(this.panel);
+
+    this.pdfViewer = pdfViewer || null;
 
     this.list = this.panel.querySelector('#seq-list')!;
 
@@ -50,8 +54,13 @@ export class SequencePanel {
     });
   }
 
+  private getCurrentPage(): number {
+    return this.pdfViewer?.getCurrentPage() || 1;
+  }
+
   render(): void {
-    const annos = annotationStore.getStore().annotations;
+    const currentPage = this.getCurrentPage();
+    const annos = annotationStore.getStore().annotations.filter(a => a.page_number === currentPage);
     this.list.innerHTML = '';
 
     annos.forEach((anno, i) => {
