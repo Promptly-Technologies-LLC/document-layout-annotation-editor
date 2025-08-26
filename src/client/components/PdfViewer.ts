@@ -1,4 +1,5 @@
 import interact from 'interactjs';
+import * as pdfjsLib from 'pdfjs-dist';
 import { pdfService } from '../services/pdfService.js';
 import { annotationStore } from '../store/annotationStore.js';
 import type { Annotation } from '../../shared/types/annotation.js';
@@ -9,6 +10,8 @@ export class PdfViewer {
   private canvas: HTMLCanvasElement;
   private overlay: HTMLElement;
   private currentPage: number = 1;
+  private renderScale: number = 1.5;
+  private rotation: number = 0;
   private isCreatingAnnotation: boolean = false;
   private startPoint: { x: number; y: number } | null = null;
   private selectionBox: HTMLElement | null = null;
@@ -82,7 +85,9 @@ export class PdfViewer {
     this.prepareContainer(); // Ensures the canvas is in the DOM and placeholder is removed.
     try {
       this.currentPage = pageNumber;
-      const pageInfo = await pdfService.renderPage(pageNumber, this.canvas);
+      const pageInfo = await pdfService.renderPage(pageNumber, this.canvas, this.renderScale, this.rotation);
+      this.renderScale = pageInfo.scale;
+      this.rotation = pageInfo.rotation;
       
       this.overlay.style.width = `${pageInfo.width}px`;
       this.overlay.style.height = `${pageInfo.height}px`;
@@ -476,15 +481,15 @@ export class PdfViewer {
     }
   }
 
-  private handleMouseUp(event: MouseEvent): void {
+  private async handleMouseUp(event: MouseEvent): Promise<void> {
     if (this.isCreatingAnnotation && this.startPoint) {
-      this.finishCreatingAnnotation(event);
+      await this.finishCreatingAnnotation(event);
     }
     
     this.isCreatingAnnotation = false;
   }
 
-  private finishCreatingAnnotation(event: MouseEvent): void {
+  private async finishCreatingAnnotation(event: MouseEvent): Promise<void> {
     if (this.selectionBox) {
       this.overlay.removeChild(this.selectionBox);
       this.selectionBox = null;
@@ -500,6 +505,8 @@ export class PdfViewer {
     const height = Math.abs(endY - this.startPoint!.y);
     
     if (width > 10 && height > 10) {
+      const selection = { x: left, y: top, w: width, h: height };
+      const extractedText = await this.extractTextFromSelectionScreenRect(selection);
       const annotation: Omit<Annotation, 'id'> = {
         left: left,
         top: top,
@@ -508,11 +515,48 @@ export class PdfViewer {
         page_number: this.currentPage,
         page_width: this.canvas.width,
         page_height: this.canvas.height,
-        text: '',
+        text: extractedText,
         type: 'Text',
       };
       
       annotationStore.addAnnotation(annotation);
+    }
+  }
+
+  private async extractTextFromSelectionScreenRect(sel: { x: number; y: number; w: number; h: number }): Promise<string> {
+    try {
+      const page = await pdfService.getPage(this.currentPage);
+      const viewport = page.getViewport({ scale: this.renderScale, rotation: this.rotation });
+      const textContent = await pdfService.getTextContent(this.currentPage);
+
+      const contains = (outer: { x: number; y: number; w: number; h: number }, inner: { x: number; y: number; w: number; h: number }) =>
+        inner.x >= outer.x &&
+        inner.y >= outer.y &&
+        inner.x + inner.w <= outer.x + outer.w &&
+        inner.y + inner.h <= outer.y + outer.h;
+
+      const pieces: Array<{ y: number; x: number; str: string }> = [];
+
+      for (const item of (textContent.items as any[])) {
+        const m = (pdfjsLib as any).Util.transform(viewport.transform, (item as any).transform);
+        const x = m[4];
+        const y = m[5];
+        const scaleY = Math.hypot(m[1], m[3]);
+        const h = scaleY;
+        const w = (item as any).width; // already in viewport units
+        // In viewport/canvas space, origin is top-left and y increases downward.
+        // m[5] is the text baseline; shift up by height to get the top-left box y.
+        const box = { x, y: y - h, w, h };
+        if (contains(sel, box)) {
+          pieces.push({ y: box.y, x: box.x, str: (item as any).str });
+        }
+      }
+
+      pieces.sort((a, b) => (Math.abs(a.y - b.y) < 2 ? a.x - b.x : a.y - b.y));
+      return pieces.map(p => p.str).join(' ');
+    } catch (err) {
+      console.error('Text extraction failed:', err);
+      return '';
     }
   }
 
