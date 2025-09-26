@@ -30,6 +30,18 @@ class App {
                   </svg>
                   Order
                 </button>
+                <!-- UI toggles -->
+                <div id="ui-toggles" class="flex items-center space-x-3">
+                  <label class="inline-flex items-center space-x-1 text-sm text-gray-700">
+                    <input id="hide-types" type="checkbox" class="h-4 w-4 text-primary-600 border-gray-300 rounded">
+                    <span>Hide labels</span>
+                  </label>
+                  <label class="inline-flex items-center space-x-1 text-sm text-gray-700">
+                    <input id="hide-texts" type="checkbox" class="h-4 w-4 text-primary-600 border-gray-300 rounded">
+                    <span>Hide text</span>
+                  </label>
+                </div>
+
                 <div id="status-text" class="text-sm text-gray-600"></div>
                 <button id="sync-btn" class="btn-primary">
                   <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -103,6 +115,34 @@ class App {
     const seqBtn = document.getElementById('seq-btn')!;
     const prevBtn = document.getElementById('prev-page')!;
     const nextBtn = document.getElementById('next-page')!;
+
+    // Wire up UI toggle checkboxes
+    const hideTypesEl = document.getElementById('hide-types') as HTMLInputElement | null;
+    const hideTextsEl = document.getElementById('hide-texts') as HTMLInputElement | null;
+
+    if (hideTypesEl) {
+      const pref = localStorage.getItem('hideAnnoTypes') === '1';
+      hideTypesEl.checked = pref;
+      document.body.classList.toggle('hide-anno-types', pref);
+
+      hideTypesEl.addEventListener('change', (e) => {
+        const checked = (e.target as HTMLInputElement).checked;
+        document.body.classList.toggle('hide-anno-types', checked);
+        localStorage.setItem('hideAnnoTypes', checked ? '1' : '0');
+      });
+    }
+
+    if (hideTextsEl) {
+      const pref = localStorage.getItem('hideAnnoTexts') === '1';
+      hideTextsEl.checked = pref;
+      document.body.classList.toggle('hide-anno-texts', pref);
+
+      hideTextsEl.addEventListener('change', (e) => {
+        const checked = (e.target as HTMLInputElement).checked;
+        document.body.classList.toggle('hide-anno-texts', checked);
+        localStorage.setItem('hideAnnoTexts', checked ? '1' : '0');
+      });
+    }
 
     syncBtn.addEventListener('click', () => this.syncAnnotations());
     seqBtn.addEventListener('click', () => this.sequencePanel.toggle());

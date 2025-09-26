@@ -144,6 +144,17 @@
     cursor: pointer;
     text-indent: -9999px; /* hides text but keeps value */
   }
+
+  /* === Annotation UI global visibility toggles === */
+  .hide-anno-types .annotation-dropdown,
+  .hide-anno-types .type-toggle {
+    display: none !important;
+  }
+
+  .hide-anno-texts .text-input,
+  .hide-anno-texts .text-toggle {
+    display: none !important;
+  }
 }
 
 @layer utilities {

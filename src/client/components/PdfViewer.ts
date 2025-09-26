@@ -177,7 +177,8 @@ export class PdfViewer {
       );
       const textInput = annotationBox?.querySelector('.text-input');
       
-      if (textInput) {
+      // Only focus if not hidden by global UI toggle
+      if (textInput && (textInput as HTMLElement).offsetParent !== null) {
         (textInput as HTMLTextAreaElement).focus();
         (textInput as HTMLTextAreaElement).setSelectionRange(
           this.restoreFocus.selectionStart,
