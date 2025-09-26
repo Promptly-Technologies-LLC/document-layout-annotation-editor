@@ -554,11 +554,18 @@ export class PdfViewer {
       }
 
       pieces.sort((a, b) => (Math.abs(a.y - b.y) < 2 ? a.x - b.x : a.y - b.y));
-      return pieces.map(p => p.str).join(' ');
+      const raw = pieces.map(p => p.str).join(' ');
+      return this.sanitizeExtractedText(raw);
     } catch (err) {
       console.error('Text extraction failed:', err);
       return '';
     }
+  }
+
+  private sanitizeExtractedText(text: string): string {
+    let cleaned = text.replace(/\s+/g, ' ');
+    cleaned = cleaned.replace(/([A-Za-z])\s+([.,])/g, '$1$2');
+    return cleaned.trim();
   }
 
 
