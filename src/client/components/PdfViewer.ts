@@ -15,6 +15,7 @@ export class PdfViewer {
   private isCreatingAnnotation: boolean = false;
   private startPoint: { x: number; y: number } | null = null;
   private selectionBox: HTMLElement | null = null;
+  private snapToContents: boolean = false;
   private restoreFocus: {
     annotationId: string;
     selectionStart: number;
@@ -69,6 +70,10 @@ export class PdfViewer {
       this.container.appendChild(this.canvas);
       this.container.appendChild(this.overlay);
     }
+  }
+
+  setSnapToContents(enabled: boolean): void {
+    this.snapToContents = enabled;
   }
 
   async loadPdf(pdfUrl: string): Promise<void> {
@@ -506,13 +511,16 @@ export class PdfViewer {
     const height = Math.abs(endY - this.startPoint!.y);
     
     if (width > 10 && height > 10) {
-      const selection = { x: left, y: top, w: width, h: height };
+      let selection = { x: left, y: top, w: width, h: height };
+      if (this.snapToContents) {
+        selection = this.snapSelectionToContents(selection);
+      }
       const extractedText = await this.extractTextFromSelectionScreenRect(selection);
       const annotation: Omit<Annotation, 'id'> = {
-        left: left,
-        top: top,
-        width: width,
-        height: height,
+        left: selection.x,
+        top: selection.y,
+        width: selection.w,
+        height: selection.h,
         page_number: this.currentPage,
         page_width: this.canvas.width,
         page_height: this.canvas.height,
@@ -530,11 +538,12 @@ export class PdfViewer {
       const viewport = page.getViewport({ scale: this.renderScale, rotation: this.rotation });
       const textContent = await pdfService.getTextContent(this.currentPage);
 
+      const TOL = 5; // pixel tolerance to include items that touch the boundary
       const contains = (outer: { x: number; y: number; w: number; h: number }, inner: { x: number; y: number; w: number; h: number }) =>
-        inner.x >= outer.x &&
-        inner.y >= outer.y &&
-        inner.x + inner.w <= outer.x + outer.w &&
-        inner.y + inner.h <= outer.y + outer.h;
+        inner.x >= outer.x - TOL &&
+        inner.y >= outer.y - TOL &&
+        inner.x + inner.w <= outer.x + outer.w + TOL &&
+        inner.y + inner.h <= outer.y + outer.h + TOL;
 
       const pieces: Array<{ y: number; x: number; str: string }> = [];
 
@@ -566,6 +575,85 @@ export class PdfViewer {
     let cleaned = text.replace(/\s+/g, ' ');
     cleaned = cleaned.replace(/([A-Za-z])\s+([.,])/g, '$1$2');
     return cleaned.trim();
+  }
+
+  // --- Snapping helpers ---
+  private clampRectToCanvas(sel: { x: number; y: number; w: number; h: number }): { x: number; y: number; w: number; h: number } {
+    const x = Math.max(0, Math.min(sel.x, this.canvas.width - 1));
+    const y = Math.max(0, Math.min(sel.y, this.canvas.height - 1));
+    const maxW = this.canvas.width - x;
+    const maxH = this.canvas.height - y;
+    const w = Math.max(0, Math.min(sel.w, maxW));
+    const h = Math.max(0, Math.min(sel.h, maxH));
+    return { x, y, w, h };
+  }
+
+  private snapSelectionToContents(sel: { x: number; y: number; w: number; h: number }): { x: number; y: number; w: number; h: number } {
+    const clamped = this.clampRectToCanvas({
+      x: Math.floor(sel.x),
+      y: Math.floor(sel.y),
+      w: Math.ceil(sel.w),
+      h: Math.ceil(sel.h),
+    });
+    if (clamped.w <= 0 || clamped.h <= 0) return sel;
+
+    const ctx = this.canvas.getContext('2d');
+    if (!ctx) return sel;
+
+    let imageData: ImageData;
+    try {
+      imageData = ctx.getImageData(clamped.x, clamped.y, clamped.w, clamped.h);
+    } catch {
+      return sel;
+    }
+
+    const data = imageData.data;
+    const stride = clamped.w * 4;
+    let minX = clamped.w, minY = clamped.h, maxX = -1, maxY = -1;
+
+    const isContent = (r: number, g: number, b: number, a: number) => {
+      if (a < 16) return false;
+      const nearWhite = (r > 245 && g > 245 && b > 245);
+      return !nearWhite;
+    };
+
+    const step = 1;
+
+    for (let y = 0; y < clamped.h; y += step) {
+      for (let x = 0; x < clamped.w; x += step) {
+        const idx = y * stride + x * 4;
+        const r = data[idx], g = data[idx + 1], b = data[idx + 2], a = data[idx + 3];
+        if (isContent(r, g, b, a)) {
+          if (x < minX) minX = x;
+          if (y < minY) minY = y;
+          if (x > maxX) maxX = x;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+
+    if (maxX < 0 || maxY < 0) {
+      return sel;
+    }
+
+    const pad = 2;
+    minX = Math.max(0, minX - pad);
+    minY = Math.max(0, minY - pad);
+    maxX = Math.min(clamped.w - 1, maxX + pad);
+    maxY = Math.min(clamped.h - 1, maxY + pad);
+
+    const snapped = {
+      x: clamped.x + minX,
+      y: clamped.y + minY,
+      w: maxX - minX + 1,
+      h: maxY - minY + 1,
+    };
+
+    if (snapped.w < 10 || snapped.h < 10) {
+      return sel;
+    }
+
+    return snapped;
   }
 
 

@@ -40,6 +40,10 @@ class App {
                     <input id="hide-texts" type="checkbox" class="h-4 w-4 text-primary-600 border-gray-300 rounded">
                     <span>Hide text</span>
                   </label>
+                  <label class="inline-flex items-center space-x-1 text-sm text-gray-700">
+                    <input id="snap-contents" type="checkbox" class="h-4 w-4 text-primary-600 border-gray-300 rounded">
+                    <span>Snap to contents</span>
+                  </label>
                 </div>
 
                 <div id="status-text" class="text-sm text-gray-600"></div>
@@ -119,6 +123,7 @@ class App {
     // Wire up UI toggle checkboxes
     const hideTypesEl = document.getElementById('hide-types') as HTMLInputElement | null;
     const hideTextsEl = document.getElementById('hide-texts') as HTMLInputElement | null;
+    const snapEl = document.getElementById('snap-contents') as HTMLInputElement | null;
 
     if (hideTypesEl) {
       const pref = localStorage.getItem('hideAnnoTypes') === '1';
@@ -141,6 +146,19 @@ class App {
         const checked = (e.target as HTMLInputElement).checked;
         document.body.classList.toggle('hide-anno-texts', checked);
         localStorage.setItem('hideAnnoTexts', checked ? '1' : '0');
+      });
+    }
+
+    // Snap-to-contents toggle
+    if (snapEl) {
+      const pref = localStorage.getItem('snapToContents') === '1';
+      snapEl.checked = pref;
+      this.pdfViewer?.setSnapToContents(pref);
+
+      snapEl.addEventListener('change', (e) => {
+        const checked = (e.target as HTMLInputElement).checked;
+        localStorage.setItem('snapToContents', checked ? '1' : '0');
+        this.pdfViewer?.setSnapToContents(checked);
       });
     }
 
