@@ -22,6 +22,10 @@ export class PdfViewer {
     selectionEnd: number;
   } | null = null;
   private uiState = new Map<string, { textCollapsed: boolean; typeCollapsed: boolean }>();
+  private autoHeaderInches: number | null = null;
+  private autoFooterInches: number | null = null;
+  private previewHeaderInches: number | null = null;
+  private previewFooterInches: number | null = null;
 
   constructor(container: HTMLElement) {
     this.container = container;
@@ -98,6 +102,8 @@ export class PdfViewer {
       this.overlay.style.height = `${pageInfo.height}px`;
       
       this.renderAnnotations();
+      // Refresh preview lines for the new page/scale
+      void this.renderPreviewLines();
     } catch (error) {
       console.error('Failed to render page:', error);
     }
@@ -192,6 +198,8 @@ export class PdfViewer {
       }
       this.restoreFocus = null;
     }
+    // Keep preview lines in sync after re-render
+    void this.renderPreviewLines();
   }
 
   private createAnnotationElement(annotation: Annotation): HTMLElement {
@@ -516,6 +524,7 @@ export class PdfViewer {
         selection = this.snapSelectionToContents(selection);
       }
       const extractedText = await this.extractTextFromSelectionScreenRect(selection);
+      const inferred = await this.inferTypeForSelection(selection);
       const annotation: Omit<Annotation, 'id'> = {
         left: selection.x,
         top: selection.y,
@@ -525,10 +534,84 @@ export class PdfViewer {
         page_width: this.canvas.width,
         page_height: this.canvas.height,
         text: extractedText,
-        type: 'Text',
+        type: inferred ?? 'Text',
       };
       
       annotationStore.addAnnotation(annotation);
+    }
+  }
+
+  setAutoHeaderFooter(opts: { headerInches?: number | null; footerInches?: number | null }): void {
+    if (opts.headerInches !== undefined) this.autoHeaderInches = opts.headerInches;
+    if (opts.footerInches !== undefined) this.autoFooterInches = opts.footerInches;
+  }
+
+  setPreviewHeaderFooter(opts: { headerInches?: number | null; footerInches?: number | null }): void {
+    if (opts.headerInches !== undefined) this.previewHeaderInches = opts.headerInches;
+    if (opts.footerInches !== undefined) this.previewFooterInches = opts.footerInches;
+    void this.renderPreviewLines();
+  }
+
+  private async getPageHeightInches(): Promise<number> {
+    const page = await pdfService.getPage(this.currentPage);
+    const viewportAt1 = page.getViewport({ scale: 1, rotation: this.rotation });
+    const heightPoints = viewportAt1.height;
+    return heightPoints / 72; // 72 points per inch
+  }
+
+  private async inferTypeForSelection(sel: { x: number; y: number; w: number; h: number }): Promise<Annotation['type'] | null> {
+    if (this.autoHeaderInches == null && this.autoFooterInches == null) return null;
+
+    const pageHeightInches = await this.getPageHeightInches();
+    const topEdgeInches = (sel.y / this.canvas.height) * pageHeightInches;
+    const bottomEdgeInches = ((sel.y + sel.h) / this.canvas.height) * pageHeightInches;
+
+    if (this.autoHeaderInches != null && bottomEdgeInches <= this.autoHeaderInches) {
+      return 'Page header';
+    }
+    if (this.autoFooterInches != null && topEdgeInches >= (pageHeightInches - this.autoFooterInches)) {
+      return 'Page footer';
+    }
+    return null;
+  }
+
+  private async renderPreviewLines(): Promise<void> {
+    // Remove existing preview lines
+    this.overlay.querySelectorAll('.hf-preview-line').forEach(el => el.remove());
+    
+    if (this.previewHeaderInches == null && this.previewFooterInches == null) return;
+    
+    let pageHeightInches = 0;
+    try {
+      const page = await pdfService.getPage(this.currentPage);
+      const viewportAt1 = page.getViewport({ scale: 1, rotation: this.rotation });
+      pageHeightInches = viewportAt1.height / 72;
+    } catch {
+      return;
+    }
+    if (pageHeightInches <= 0 || this.canvas.height <= 0) return;
+
+    const addLineAt = (y: number) => {
+      const yPx = Math.max(0, Math.min(this.canvas.height - 1, Math.round(y)));
+      const line = document.createElement('div');
+      line.className = 'hf-preview-line';
+      line.style.position = 'absolute';
+      line.style.left = '0px';
+      line.style.right = '0px';
+      line.style.top = `${yPx}px`;
+      line.style.height = '0px';
+      line.style.borderTop = '2px solid rgba(220, 38, 38, 0.9)';
+      line.style.pointerEvents = 'none';
+      this.overlay.appendChild(line);
+    };
+
+    if (this.previewHeaderInches != null && this.previewHeaderInches > 0) {
+      const yHeader = (this.previewHeaderInches / pageHeightInches) * this.canvas.height;
+      addLineAt(yHeader);
+    }
+    if (this.previewFooterInches != null && this.previewFooterInches > 0) {
+      const yFooter = this.canvas.height - (this.previewFooterInches / pageHeightInches) * this.canvas.height;
+      addLineAt(yFooter);
     }
   }
 

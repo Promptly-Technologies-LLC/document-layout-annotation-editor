@@ -23,14 +23,30 @@ class App {
           <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center py-4">
               <h1 class="text-2xl font-bold text-gray-900">PDF Annotation Editor</h1>
+              <div id="file-manager-header" class="flex items-center space-x-4"></div>
+            </div>
+          </div>
+        </header>
+
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="border-b">
+            <div class="flex items-center justify-between p-3 bg-white">
               <div class="flex items-center space-x-4">
-                <button id="seq-btn" class="btn-secondary">
-                  <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
-                  </svg>
-                  Order
-                </button>
-                <!-- UI toggles -->
+                <!-- Margin controls left -->
+                <div class="flex items-center space-x-3">
+                  <label class="inline-flex items-center space-x-1 text-sm text-gray-700">
+                    <span>Header inches</span>
+                    <input id="hf-header-inches" type="number" min="0" step="0.25" value="0" class="input w-20">
+                  </label>
+                  <label class="inline-flex items-center space-x-1 text-sm text-gray-700">
+                    <span>Footer inches</span>
+                    <input id="hf-footer-inches" type="number" min="0" step="0.25" value="0" class="input w-20">
+                  </label>
+                  <button id="hf-apply" class="btn-secondary" title="Apply header/footer inches: reclassify existing annotations and set defaults for new boxes">Apply</button>
+                </div>
+              </div>
+              <div class="flex items-center space-x-4">
+                <!-- UI toggles beside Order -->
                 <div id="ui-toggles" class="flex items-center space-x-3">
                   <label class="inline-flex items-center space-x-1 text-sm text-gray-700">
                     <input id="hide-types" type="checkbox" class="h-4 w-4 text-primary-600 border-gray-300 rounded">
@@ -45,21 +61,15 @@ class App {
                     <span>Snap to contents</span>
                   </label>
                 </div>
-
-                <div id="status-text" class="text-sm text-gray-600"></div>
-                <button id="sync-btn" class="btn-primary">
-                  <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M12 12v9m-4-4l4-4 4 4"></path>
+                <button id="seq-btn" class="btn-secondary">
+                  <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
                   </svg>
-                  Sync
+                  Order
                 </button>
               </div>
             </div>
           </div>
-        </header>
-
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div id="file-manager" class="border-b"></div>
         </div>
 
         <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -101,7 +111,7 @@ class App {
   }
 
   private setupComponents(): void {
-    const fileManagerContainer = document.getElementById('file-manager')!;
+    const fileManagerContainer = document.getElementById('file-manager-header')!;
     const pdfViewerContainer = document.getElementById('pdf-viewer')!;
 
     new FileManager(fileManagerContainer, {
@@ -183,8 +193,120 @@ class App {
       }
     });
 
+    // Header/Footer inches + apply
+    const headerInput = document.getElementById('hf-header-inches') as HTMLInputElement | null;
+    const footerInput = document.getElementById('hf-footer-inches') as HTMLInputElement | null;
+    const applyBtn = document.getElementById('hf-apply');
+
+    if (headerInput) {
+      const saved = localStorage.getItem('hfHeaderInches');
+      headerInput.value = saved ?? '0';
+      headerInput.addEventListener('input', () => {
+        const n = parseFloat(headerInput.value || '0');
+        const val = isNaN(n) ? 0 : Math.max(0, n);
+        this.pdfViewer?.setPreviewHeaderFooter({ headerInches: val });
+      });
+    }
+    if (footerInput) {
+      const saved = localStorage.getItem('hfFooterInches');
+      footerInput.value = saved ?? '0';
+      footerInput.addEventListener('input', () => {
+        const n = parseFloat(footerInput.value || '0');
+        const val = isNaN(n) ? 0 : Math.max(0, n);
+        this.pdfViewer?.setPreviewHeaderFooter({ footerInches: val });
+      });
+    }
+
+    const readInches = (input: HTMLInputElement | null, key: string) => {
+      const raw = input?.value ?? '0';
+      const n = parseFloat(raw);
+      const val = isNaN(n) ? 0 : Math.max(0, n);
+      localStorage.setItem(key, String(val));
+      if (input) input.value = String(val);
+      return val;
+    };
+
+    applyBtn?.addEventListener('click', async () => {
+      const headerInches = readInches(headerInput, 'hfHeaderInches');
+      const footerInches = readInches(footerInput, 'hfFooterInches');
+
+      // Bulk reclassify both regions (header first, then footer)
+      if (headerInches > 0) {
+        await this.classifyRegionOnce('header', headerInches);
+      }
+      if (footerInches > 0) {
+        await this.classifyRegionOnce('footer', footerInches);
+      }
+
+      // Enable autolabeling for future boxes
+      this.pdfViewer?.setAutoHeaderFooter({ headerInches, footerInches });
+      // Clear preview lines
+      this.pdfViewer?.setPreviewHeaderFooter({ headerInches: null, footerInches: null });
+      this.sequencePanel.render();
+    });
+
+    // Clear preview if clicking anywhere else in the app besides these inputs or Apply
+    document.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      const isHeaderInput = target.id === 'hf-header-inches';
+      const isFooterInput = target.id === 'hf-footer-inches';
+      const isApply = target.id === 'hf-apply';
+      if (!isHeaderInput && !isFooterInput && !isApply) {
+        this.pdfViewer?.setPreviewHeaderFooter({ headerInches: null, footerInches: null });
+      }
+    }, true);
+
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => this.handleKeyboardShortcuts(e));
+  }
+
+  private async classifyRegionOnce(region: 'header' | 'footer', inches: number): Promise<void> {
+    const totalPages = pdfService.getTotalPages();
+    if (totalPages === 0) {
+      alert('Load a PDF first.');
+      return;
+    }
+
+    const pageHeightsInches = new Map<number, number>();
+    for (let p = 1; p <= totalPages; p++) {
+      const page = await pdfService.getPage(p);
+      const viewportAt1 = page.getViewport({ scale: 1, rotation: 0 });
+      pageHeightsInches.set(p, viewportAt1.height / 72);
+    }
+
+    const store = annotationStore.getStore();
+    const prevSelected = store.selectedAnnotation;
+
+    let changed = 0;
+    for (const a of store.annotations) {
+      const pageHeightInches = pageHeightsInches.get(a.page_number);
+      if (!pageHeightInches || a.page_height <= 0) continue;
+
+      const topEdgeInches = (a.top / a.page_height) * pageHeightInches;
+      const bottomEdgeInches = ((a.top + a.height) / a.page_height) * pageHeightInches;
+
+      if (region === 'header') {
+        // Full containment: entire box within top `inches` band
+        if (bottomEdgeInches <= inches && a.type !== 'Page header') {
+          annotationStore.updateAnnotation(a.id, { type: 'Page header' }, true);
+          changed++;
+        }
+      } else {
+        // Full containment: entire box within bottom `inches` band
+        if (topEdgeInches >= (pageHeightInches - inches) && a.type !== 'Page footer') {
+          annotationStore.updateAnnotation(a.id, { type: 'Page footer' }, true);
+          changed++;
+        }
+      }
+    }
+
+    if (changed > 0) {
+      annotationStore.selectAnnotation(prevSelected);
+      console.log(`Reclassified ${changed} annotations to ${region === 'header' ? 'Page header' : 'Page footer'}.`);
+    } else {
+      console.log('No annotations matched the selected region.');
+    }
   }
 
   private setupStoreSubscription(): void {
@@ -217,6 +339,7 @@ class App {
       console.log('PDF loaded successfully');
       this.updatePageInfo();
       this.sequencePanel.render();
+      this.resetPerDocumentOptions();
     } catch (error) {
       console.error('Failed to load PDF:', error);
     }
@@ -226,9 +349,26 @@ class App {
     this.currentJson = filename;
     try {
       await annotationStore.loadAnnotations(filename);
+      this.resetPerDocumentOptions();
     } catch (error) {
       console.error('Failed to load annotations:', error);
     }
+  }
+
+  private resetPerDocumentOptions(): void {
+    // Reset auto-labeling thresholds and UI input
+    this.pdfViewer?.setAutoHeaderFooter({ headerInches: null, footerInches: null });
+    const headerInput = document.getElementById('hf-header-inches') as HTMLInputElement | null;
+    const footerInput = document.getElementById('hf-footer-inches') as HTMLInputElement | null;
+    if (headerInput) headerInput.value = '0';
+    if (footerInput) footerInput.value = '0';
+    // Reset toggles to persisted values (do not override user global prefs)
+    const hideTypesEl = document.getElementById('hide-types') as HTMLInputElement | null;
+    const hideTextsEl = document.getElementById('hide-texts') as HTMLInputElement | null;
+    const snapEl = document.getElementById('snap-contents') as HTMLInputElement | null;
+    if (hideTypesEl) hideTypesEl.checked = localStorage.getItem('hideAnnoTypes') === '1';
+    if (hideTextsEl) hideTextsEl.checked = localStorage.getItem('hideAnnoTexts') === '1';
+    if (snapEl) snapEl.checked = localStorage.getItem('snapToContents') === '1';
   }
 
   // This method is now only for local saving (autosave, shortcuts)

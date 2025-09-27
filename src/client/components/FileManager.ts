@@ -24,7 +24,7 @@ export class FileManager {
 
   private setupElements(): void {
     this.container.innerHTML = `
-      <div class="flex items-center space-x-4 p-4 bg-white border-b">
+      <div class="flex items-center space-x-4">
         <div class="flex items-center space-x-2">
           <label class="text-sm font-medium text-gray-700">PDF:</label>
           <select class="select w-48" id="pdf-select">
@@ -44,6 +44,14 @@ export class FileManager {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
           </svg>
           Refresh
+        </button>
+
+        <div id="status-text" class="text-sm text-gray-600"></div>
+        <button id="sync-btn" class="btn-primary">
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M12 12v9m-4-4l4-4 4 4"></path>
+          </svg>
+          Sync
         </button>
       </div>
     `;
